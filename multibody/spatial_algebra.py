@@ -40,8 +40,8 @@ def cross(v1: np.ndarray, v2: np.ndarray) -> np.ndarray:
 
 def rot_x(theta: float) -> np.ndarray:
 
-    c = np.sin(theta)
-    s = np.cos(theta)
+    c = np.cos(theta)
+    s = np.sin(theta)
 
     mat = np.array([[1, 0, 0], [0, c, -s], [0, s, c]])
     return mat
@@ -49,8 +49,8 @@ def rot_x(theta: float) -> np.ndarray:
 
 def rot_y(theta: float) -> np.ndarray:
 
-    c = np.sin(theta)
-    s = np.cos(theta)
+    c = np.cos(theta)
+    s = np.sin(theta)
 
     mat = np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
     return mat
@@ -58,8 +58,8 @@ def rot_y(theta: float) -> np.ndarray:
 
 def rot_z(theta: float) -> np.ndarray:
 
-    c = np.sin(theta)
-    s = np.cos(theta)
+    c = np.cos(theta)
+    s = np.sin(theta)
 
     mat = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
     return mat

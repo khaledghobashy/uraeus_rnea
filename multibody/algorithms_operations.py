@@ -39,6 +39,15 @@ def evaluate_successor_kinematics(
     p_GB = get_pose_from_transformation(X_GB)
     v_GB = spatial_motion_rotation(R_GB) @ v_B
 
+    print("v_J = ", joint_kin.v_J)
+    print("X_SP @ v_B = ", joint_kin.X_SP @ predecessor_kin.v_B)
+    print("v_B = ", v_B)
+    print("v_GB = ", v_GB)
+    print("predecessor_kin.X_GB = ", predecessor_kin.X_GB)
+    print("X_GB = ", X_GB)
+    print("R_GB = ", R_GB)
+    print("\n")
+
     v_s0 = translational_spatial_vector(v_B)
     a_GB = spatial_motion_rotation(R_GB) @ (a_B - cross(v_s0, v_B))
 

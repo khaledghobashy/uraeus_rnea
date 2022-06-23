@@ -37,6 +37,7 @@ def base_to_tip(
     joints_kinematics = eval_joints_kinematics(joints, joints_coordinates)
 
     for joint, joint_kin in zip(joints, joints_kinematics):
+        print(joint.name)
         predecessor = joint.predecessor.name
         successor = joint.successor.name
 

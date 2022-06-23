@@ -53,7 +53,7 @@ class MotionEquationsMeta(type):
 
     def __new__(cls, class_name, bases, attrs):
 
-        if class_name == "AbstractMotionEquation":
+        if class_name == "AbstractMotionEquations":
             return type.__new__(cls, class_name, bases, attrs)
 
         for attr in cls._required_fields:
@@ -70,7 +70,7 @@ class AbstractMotionEquations(object, metaclass=MotionEquationsMeta):
     nj: int
 
     @staticmethod
-    def pose_polynomilas(qd0: np.ndarray) -> np.ndarray:
+    def pose_polynomials(qd0: np.ndarray) -> np.ndarray:
         pass
 
     @staticmethod
@@ -87,7 +87,7 @@ class RevolutePolynomials(AbstractMotionEquations):
     nj = 1
 
     @staticmethod
-    def pose_polynomilas(qd0: np.ndarray):
+    def pose_polynomials(qd0: np.ndarray):
         psi = qd0[0]
         pose_states = np.array([0, 0, psi, 0, 0, 0])
         return pose_states
@@ -108,7 +108,7 @@ class TranslationalPolynomials(AbstractMotionEquations):
     nj = 1
 
     @staticmethod
-    def pose_polynomilas(qd0: np.ndarray):
+    def pose_polynomials(qd0: np.ndarray):
         z = qd0[0]
         pose_states = np.array([0, 0, 0, 0, 0, z])
         return pose_states
@@ -129,7 +129,7 @@ class PlanarPolynomials(AbstractMotionEquations):
     nj = 3
 
     @staticmethod
-    def pose_polynomilas(qdt0: np.ndarray):
+    def pose_polynomials(qdt0: np.ndarray):
         psi, x, y = qdt0
         pose_states = np.array([0, 0, psi, x, y, 0])
         return pose_states
@@ -159,7 +159,7 @@ class FreePolynomials(AbstractMotionEquations):
     nj = 6
 
     @staticmethod
-    def pose_polynomilas(qdt0: np.ndarray):
+    def pose_polynomials(qdt0: np.ndarray):
         phi, theta, psi, x, y, z = qdt0
         pose_states = np.array([0, 0, psi, x, y, 0])
         return pose_states

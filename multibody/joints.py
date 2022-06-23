@@ -49,7 +49,7 @@ class JointData(NamedTuple):
 
     pos: np.ndarray
     axis: np.ndarray
-    x_axis: np.ndarray
+    x_axis: np.ndarray = None
 
 
 class StateNames(NamedTuple):
@@ -76,7 +76,7 @@ def evaluate_joint_kinematics(
 
     a_J = X_SM @ a_J
 
-    kinematics = JointKinematics(X_FM, X_SP, S_FM, v_J, a_J)
+    kinematics = JointKinematics(X_FM, X_SP, X_PS, S_FM, v_J, a_J)
 
     return kinematics
 
@@ -135,28 +135,28 @@ class RevoluteJoint(AbstractJoint):
 
     nj: int = 1
     mobilizer: AbstractMobilizer = RevoluteMobilizer()
-    coordinate_names: List[str] = ["psi"]
+    coordinates_names: List[str] = ["psi"]
 
 
 class TranslationalJoint(AbstractJoint):
 
     nj: int = 1
     mobilizer: AbstractMobilizer = TranslationalMobilizer()
-    coordinate_names: List[str] = ["z"]
+    coordinates_names: List[str] = ["z"]
 
 
 class PlanarJoint(AbstractJoint):
 
     nj: int = 3
     mobilizer: AbstractMobilizer = PlanarMobilizer()
-    coordinate_names: List[str] = ["psi", "x", "y"]
+    coordinates_names: List[str] = ["psi", "x", "y"]
 
 
 class FreeJoint(AbstractJoint):
 
     nj: int = 6
     mobilizer: AbstractMobilizer = FreeMobilizer()
-    coordinate_names: List[str] = ["phi", "theta", "psi", "x", "y", "z"]
+    coordinates_names: List[str] = ["phi", "theta", "psi", "x", "y", "z"]
 
 
 def construct_custom_joint(

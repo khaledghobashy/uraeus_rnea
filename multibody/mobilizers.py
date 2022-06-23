@@ -69,7 +69,7 @@ class CustomMobilizer(AbstractMobilizer):
         orientation, location = np.split(pose_dt0, 2)
         phi, theta, psi = orientation
         R_FM = rot_z(psi) @ rot_y(theta) @ rot_x(phi)
-        return spatial_motion_transformation(R_FM, -R_FM @ location)
+        return spatial_motion_transformation(R_FM, -R_FM.T @ location)
 
     def W_FM_dt0(self, qdt0: np.ndarray) -> np.ndarray:
 
@@ -112,7 +112,7 @@ class CustomMobilizer(AbstractMobilizer):
         y_col_dt1 = skew_matrix(omega_1.flatten()) @ y_col_dt0
         x_col_dt1 = skew_matrix(omega_2.flatten()) @ x_col_dt0
 
-        W_FM_dt1 = np.column_stack(x_col_dt1, y_col_dt1, z_col_dt1)
+        W_FM_dt1 = np.column_stack([x_col_dt1, y_col_dt1, z_col_dt1])
 
         return W_FM_dt1
 
@@ -148,8 +148,10 @@ class CustomMobilizer(AbstractMobilizer):
         W_FM_dt0 = self.W_FM_dt0(qdt0)
         A_FM_dt0 = np.eye(3)
         pose_jacobian_dt0 = self.polynomials.pose_jacobian_dt0(qdt0)
+
+        print(W_FM_dt0, pose_jacobian_dt0[:0], pose_jacobian_dt0[:3])
         S_FM = np.vstack(
-            [W_FM_dt0 @ pose_jacobian_dt0[:0], A_FM_dt0 @ pose_jacobian_dt0[:3]]
+            [W_FM_dt0 @ pose_jacobian_dt0[:3], A_FM_dt0 @ pose_jacobian_dt0[3:]]
         )
         return S_FM
 
@@ -165,14 +167,14 @@ class CustomMobilizer(AbstractMobilizer):
         pose_dt2 = (pose_jacobian_dt0 @ qdt2) + (pose_jacobian_dt1 @ qdt1)
 
         W_FM_dt0 = self.W_FM_dt0(qdt0)
-        W_FM_dt1 = self.W_FM_dt0(W_FM_dt0, pose_dt1)
+        W_FM_dt1 = self.W_FM_dt1(W_FM_dt0, pose_dt1)
 
         # position-level evaluations
         orientation_dt0, location_dt0 = np.split(pose_dt0, 2)
         phi, theta, psi = orientation_dt0
         R_FM = rot_z(psi) @ rot_y(theta) @ rot_x(phi)
-        X_FM = spatial_motion_transformation(R_FM, -R_FM @ location_dt0)
-        S_FM = np.vstack([W_FM_dt0 @ pose_jacobian_dt0[:0], pose_jacobian_dt0[:3]])
+        X_FM = spatial_motion_transformation(R_FM, -R_FM.T @ location_dt0)
+        S_FM = np.vstack([W_FM_dt0 @ pose_jacobian_dt0[:3], pose_jacobian_dt0[3:]])
 
         # velocity-level evaluations
         orientation_dt1, location_dt1 = np.split(pose_dt1, 2)

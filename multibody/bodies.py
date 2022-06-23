@@ -45,7 +45,9 @@ class RigidBody(object):
             ]
         )
 
-        self.kinematics = get_initialized_body_kinematics()
+        self.kinematics = get_initialized_body_kinematics(
+            body_data.location, body_data.orientation
+        )
 
 
 def get_initialized_body_kinematics(
