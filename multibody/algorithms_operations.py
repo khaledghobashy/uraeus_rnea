@@ -39,14 +39,14 @@ def evaluate_successor_kinematics(
     p_GB = get_pose_from_transformation(X_GB)
     v_GB = spatial_motion_rotation(R_GB) @ v_B
 
-    print("v_J = ", joint_kin.v_J)
-    print("X_SP @ v_B = ", joint_kin.X_SP @ predecessor_kin.v_B)
-    print("v_B = ", v_B)
-    print("v_GB = ", v_GB)
-    print("predecessor_kin.X_GB = ", predecessor_kin.X_GB)
-    print("X_GB = ", X_GB)
-    print("R_GB = ", R_GB)
-    print("\n")
+    # print("v_J = ", joint_kin.v_J)
+    # print("X_SP @ v_B = ", joint_kin.X_SP @ predecessor_kin.v_B)
+    # print("v_B = ", v_B)
+    # print("v_GB = ", v_GB)
+    # print("predecessor_kin.X_GB = ", predecessor_kin.X_GB)
+    # print("X_GB = ", X_GB)
+    # print("R_GB = ", R_GB)
+    # print("\n")
 
     v_s0 = translational_spatial_vector(v_B)
     a_GB = spatial_motion_rotation(R_GB) @ (a_B - cross(v_s0, v_B))
@@ -60,7 +60,7 @@ def evaluate_joint_forces(
     successor_kin: BodyKinematics,
     joint_kin: JointKinematics,
     joint_frames: JointFrames,
-    out_joint: List[AbstractJoint],
+    out_joint: List[JointVariables],
     external_forces: List[np.ndarray],
 ):
 
@@ -90,7 +90,9 @@ def evaluate_joint_forces(
     )
     fc_G = E_GB @ fc_S
 
-    return MobilizerForces(fi_S, fc_S, fa_S, tau, fc_G)
+    print("R_GB = ", get_orientation_matrix_from_transformation(successor_kin.X_GB))
+
+    return MobilizerForces(fi_S, fc_S, fa_S, fc_G, tau)
 
 
 def extract_force_components(

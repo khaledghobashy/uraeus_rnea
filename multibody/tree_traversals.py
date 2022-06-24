@@ -37,7 +37,7 @@ def base_to_tip(
     joints_kinematics = eval_joints_kinematics(joints, joints_coordinates)
 
     for joint, joint_kin in zip(joints, joints_kinematics):
-        print(joint.name)
+        # print(joint.name)
         predecessor = joint.predecessor.name
         successor = joint.successor.name
 
@@ -45,28 +45,31 @@ def base_to_tip(
             bodies_kinematics[predecessor], joint_kin
         )
 
-    return (list(bodies_kinematics.values())[1:], joints_kinematics)
+    return (bodies_kinematics, joints_kinematics)
 
 
 def tip_to_base(
     joints: List[AbstractJoint],
     joints_kinematics: List[JointKinematics],
+    bodies_kinematics: Dict[str, BodyKinematics],
     adj_joint: Dict[str, List[AbstractJoint]],
     forces_map: Dict[str, Dict[str, np.ndarray]],
 ) -> Tuple[np.ndarray, ...]:
 
     joints_forces = {}
 
-    iterable = reversed(zip(joints, joints_kinematics))
+    iterable = zip(reversed(joints), reversed(joints_kinematics))
+
+    joints_dict = dict(zip([j.name for j in joints], joints_kinematics))
 
     for joint, joint_kin in iterable:
 
         successor_name = joint.successor.name
         successor_I = joint.successor.I
-        successor_kin = joint.successor.kinematics
+        successor_kin = bodies_kinematics[successor_name]
 
         out_joints_variables = [
-            JointVariables(j.kinematics, joints_forces[j.name])
+            JointVariables(joints_dict[j.name], joints_forces[j.name])
             for j in adj_joint[successor_name]
         ]
 

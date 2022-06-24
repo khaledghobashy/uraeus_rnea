@@ -91,7 +91,7 @@ class AbstractJoint(ABC):
     successor: RigidBody
     frames: JointFrames
 
-    kinematics: JointKinematics
+    # kinematics: JointKinematics
     state_names: StateNames
 
     def __init__(
