@@ -1,9 +1,9 @@
 from typing import NamedTuple, Callable, Tuple
 
-import jax
+# import jax
 import numpy as np
 
-# from multibody.spatial_algebra import
+# import numpy as np
 
 
 def construct_motion_jacobians(
@@ -161,7 +161,7 @@ class FreePolynomials(AbstractMotionEquations):
     @staticmethod
     def pose_polynomials(qdt0: np.ndarray):
         phi, theta, psi, x, y, z = qdt0
-        pose_states = np.array([0, 0, psi, x, y, 0])
+        pose_states = np.array([phi, theta, psi, x, y, z])
         return pose_states
 
     @staticmethod

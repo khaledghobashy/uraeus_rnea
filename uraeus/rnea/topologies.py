@@ -1,9 +1,17 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, NamedTuple, Optional
 from collections import defaultdict
 from functools import reduce
 
-from multibody.bodies import RigidBody, RigidBodyData
-from multibody.joints import AbstractJoint, JointData, initialize_joint
+from uraeus.rnea.bodies import RigidBody, RigidBodyData
+from uraeus.rnea.joints import (
+    AbstractJoint,
+    JointData,
+    JointConfigInputs,
+    JointInstance,
+    construct_functional_joint,
+    construct_joint_instance,
+    initialize_joint,
+)
 
 
 class Graph(object):
@@ -46,7 +54,7 @@ class MultiBodyTree(object):
     name: str
     tree: Tree
     bodies: Dict[str, RigidBody]
-    joints: Dict[str, AbstractJoint]
+    joints: Dict[str, JointInstance]
 
     def __init__(self, name: str):
 
@@ -58,7 +66,7 @@ class MultiBodyTree(object):
 
     @property
     def dof(self) -> int:
-        return sum(j.nj for j in self.joints.values())
+        return sum(j.joint_type.nj for j in self.joints.values())
 
     def add_joint(
         self,
@@ -67,7 +75,7 @@ class MultiBodyTree(object):
         successor: str,
         succ_data: RigidBodyData,
         joint_type: AbstractJoint,
-        joint_data: JointData,
+        joint_data: JointConfigInputs,
     ) -> None:
 
         if self.check_if_joint_exists(joint_name):
@@ -80,12 +88,19 @@ class MultiBodyTree(object):
 
         joint_frames = initialize_joint(
             joint_data.pos,
-            (joint_data.axis, joint_data.x_axis),
+            joint_data.z_axis,
+            joint_data.x_axis,
             pred_body.kinematics.X_BG,
             succ_body.kinematics.X_BG,
         )
 
-        joint = joint_type(joint_name, pred_body, succ_body, joint_frames)
+        joint = construct_joint_instance(
+            joint_type=joint_type,
+            name=joint_name,
+            predecessor=pred_body,
+            successor=succ_body,
+            joint_frames=joint_frames,
+        )
 
         self.bodies[successor] = succ_body
         self.joints[joint_name] = joint
@@ -108,9 +123,23 @@ class MultiBodyTree(object):
 
 def construct_out_joints_map(
     model_tree: MultiBodyTree,
-) -> Dict[str, List[AbstractJoint]]:
+) -> Dict[str, List[JointInstance]]:
 
     out_joints = {b: [] for b in model_tree.bodies}
     for j in model_tree.joints.values():
-        out_joints[j.predecessor.name].append(j)
+        out_joints[j.joint_data.predecessor.name].append(j)
     return out_joints
+
+
+def contstruct_traversal_order(tree: MultiBodyTree):
+    bodies_indicies = {b: i for i, b in enumerate(tree.bodies)}
+    joints = [
+        (
+            j,
+            bodies_indicies[j.joint_data.predecessor.name],
+            bodies_indicies[j.joint_data.successor.name],
+        )
+        for j in tree.joints.values()
+    ]
+    joints = list(map(construct_functional_joint, joints))
+    return joints

@@ -1,9 +1,9 @@
 from typing import List, Tuple
 
-import jax
+# import jax
 import numpy as np
 
-from multibody.spatial_algebra import (
+from uraeus.rnea.spatial_algebra import (
     spatial_motion_rotation,
     spatial_transform_transpose,
     spatial_skew,
@@ -12,9 +12,14 @@ from multibody.spatial_algebra import (
     motion_to_force_transform,
     cross,
 )
-from multibody.bodies import BodyKinematics
-from multibody.joints import AbstractJoint, JointKinematics, JointFrames, JointVariables
-from multibody.mobilizers import MobilizerForces
+from uraeus.rnea.bodies import BodyKinematics
+from uraeus.rnea.joints import (
+    AbstractJoint,
+    JointKinematics,
+    JointFrames,
+    JointVariables,
+)
+from uraeus.rnea.mobilizers import MobilizerForces
 
 
 def evaluate_successor_kinematics(
@@ -90,7 +95,37 @@ def evaluate_joint_forces(
     )
     fc_G = E_GB @ fc_S
 
-    print("R_GB = ", get_orientation_matrix_from_transformation(successor_kin.X_GB))
+    return MobilizerForces(fi_S, fc_S, fa_S, fc_G, tau)
+
+
+def evaluate_joint_force_p1(
+    successor_kin: BodyKinematics,
+    successor_I: np.ndarray,
+    external_forces: List[np.ndarray],
+):
+    fb_S = (successor_I @ successor_kin.a_B) + (
+        motion_to_force_transform(spatial_skew(successor_kin.v_B))
+        @ (successor_I @ successor_kin.v_B)
+    )
+    R_BG = get_orientation_matrix_from_transformation(successor_kin.X_BG)
+    E_BG = spatial_motion_rotation(R_BG)
+    fe_S = E_BG @ sum(external_forces, np.zeros((6,)))
+
+    return fb_S - fe_S
+
+
+def eval_joint_force_components(
+    fi_S: np.ndarray,
+    joint_frames: JointFrames,
+    joint_kin: JointKinematics,
+    successor_kin: BodyKinematics,
+):
+    fc_S, fa_S, tau = extract_force_components(fi_S, joint_frames, joint_kin)
+
+    E_GB = spatial_motion_rotation(
+        get_orientation_matrix_from_transformation(successor_kin.X_GB)
+    )
+    fc_G = E_GB @ fc_S
 
     return MobilizerForces(fi_S, fc_S, fa_S, fc_G, tau)
 

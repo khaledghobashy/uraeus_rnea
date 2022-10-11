@@ -2,7 +2,7 @@ from typing import NamedTuple
 
 import numpy as np
 
-from multibody.spatial_algebra import (
+from uraeus.rnea.spatial_algebra import (
     spatial_motion_transformation,
     spatial_transform_transpose,
     get_euler_angles_from_rotation,

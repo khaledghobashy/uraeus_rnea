@@ -1,5 +1,6 @@
+# import jax
+import jax.numpy as jnp
 import numpy as np
-import jax
 
 
 def skew_matrix(v: np.ndarray) -> np.ndarray:

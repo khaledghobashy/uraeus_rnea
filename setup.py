@@ -1,12 +1,9 @@
 import setuptools
 
-# with open("README.rst", "r") as fh:
-#     long_description = fh.read()
-
-short_description = "A python package for symbolic creation and analysis of constrained multi-body systems."
+short_description = "Modeling and Simulation of tree-like multibody systems using Recusrive Newton-Euler Algorithms"
 
 setuptools.setup(
-    name="featherstone",
+    name="uraeus.rnea",
     version="0.0.1.dev3",
     author="Khaled Ghobashy",
     author_email="khaled.ghobashy@live.com",

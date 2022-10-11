@@ -3,7 +3,7 @@
 from typing import Callable, NamedTuple
 import numpy as np
 
-from multibody.spatial_algebra import (
+from uraeus.rnea.spatial_algebra import (
     rot_x,
     rot_y,
     rot_z,
@@ -11,7 +11,7 @@ from multibody.spatial_algebra import (
     spatial_motion_transformation,
 )
 
-from multibody.motion_equations import (
+from uraeus.rnea.motion_equations import (
     MotionEquations,
     RevolutePolynomials,
     TranslationalPolynomials,
@@ -36,6 +36,9 @@ class MobilizerForces(NamedTuple):
 
 
 class AbstractMobilizer(NamedTuple):
+
+    nj: int = None
+
     def X_FM(self, qdt0: np.ndarray) -> np.ndarray:
         raise NotImplementedError
 

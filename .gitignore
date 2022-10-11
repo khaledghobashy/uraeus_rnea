@@ -2,4 +2,7 @@
 *.devcontainer
 *.ipynb_checkpoints
 *.egg-info
-*/_temp
+*/**/_temp
+*.png
+*/**/models
+*/**/tests
