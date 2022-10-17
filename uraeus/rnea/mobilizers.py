@@ -8,7 +8,9 @@ from uraeus.rnea.spatial_algebra import (
     rot_y,
     rot_z,
     skew_matrix,
+    spatial_motion_rotation,
     spatial_motion_transformation,
+    spatial_motion_translation,
 )
 
 from uraeus.rnea.motion_equations import (
@@ -140,7 +142,7 @@ class CustomMobilizer(AbstractMobilizer):
         orientation_dt2, location_dt2 = np.split(pose_dt2, 2)
 
         W_FM_dt0 = self.W_FM_dt0(qdt0)
-        W_FM_dt1 = self.W_FM_dt0(W_FM_dt0, pose_dt1)
+        W_FM_dt1 = self.W_FM_dt1(W_FM_dt0, pose_dt1)
 
         angular_acc = (W_FM_dt0 @ orientation_dt2) + (W_FM_dt1 @ orientation_dt1)
 
@@ -152,7 +154,6 @@ class CustomMobilizer(AbstractMobilizer):
         A_FM_dt0 = np.eye(3)
         pose_jacobian_dt0 = self.polynomials.pose_jacobian_dt0(qdt0)
 
-        print(W_FM_dt0, pose_jacobian_dt0[:0], pose_jacobian_dt0[:3])
         S_FM = np.vstack(
             [W_FM_dt0 @ pose_jacobian_dt0[:3], A_FM_dt0 @ pose_jacobian_dt0[3:]]
         )
@@ -173,19 +174,19 @@ class CustomMobilizer(AbstractMobilizer):
         W_FM_dt1 = self.W_FM_dt1(W_FM_dt0, pose_dt1)
 
         # position-level evaluations
-        orientation_dt0, location_dt0 = np.split(pose_dt0, 2)
+        orientation_dt0, location_dt0 = pose_dt0.reshape(2, -1)
         phi, theta, psi = orientation_dt0
         R_FM = rot_z(psi) @ rot_y(theta) @ rot_x(phi)
         X_FM = spatial_motion_transformation(R_FM, -R_FM.T @ location_dt0)
         S_FM = np.vstack([W_FM_dt0 @ pose_jacobian_dt0[:3], pose_jacobian_dt0[3:]])
 
         # velocity-level evaluations
-        orientation_dt1, location_dt1 = np.split(pose_dt1, 2)
+        orientation_dt1, location_dt1 = pose_dt1.reshape(2, -1)
         angular_vel = W_FM_dt0 @ orientation_dt1
         spatial_vel = np.hstack([angular_vel, location_dt1])
 
         # acceleration-level evaluations
-        orientation_dt2, location_dt2 = np.split(pose_dt2, 2)
+        orientation_dt2, location_dt2 = pose_dt2.reshape(2, -1)
         angular_acc = (W_FM_dt1 @ orientation_dt1) + (W_FM_dt0 @ orientation_dt2)
         spatial_acc = np.hstack([angular_acc, location_dt2])
 
@@ -198,11 +199,59 @@ class RevoluteMobilizer(CustomMobilizer):
     nj = 1
     polynomials: MotionEquations = RevolutePolynomials
 
+    def X_FM(self, qdt0: np.ndarray) -> np.ndarray:
+        psi_dt0 = qdt0[0]
+        return spatial_motion_rotation(rot_z(psi_dt0))
+
+    def S_FM(self, qdt0: np.ndarray) -> np.ndarray:
+        return np.array([0, 0, 1, 0, 0, 0])[:, None]
+
+    def v_J(self, qdt0: np.ndarray, qdt1: np.ndarray) -> np.ndarray:
+        psi_dt1 = qdt1[0]
+        return np.array([0, 0, psi_dt1, 0, 0, 0])
+
+    def a_J(self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray) -> np.ndarray:
+        psi_dt2 = qdt2[0]
+        return np.array([0, 0, psi_dt2, 0, 0, 0])
+
+    def evaluate_kinematics(
+        self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
+    ) -> MobilizerKinematics:
+        X_FM = self.X_FM(qdt0)
+        S_FM = self.S_FM(qdt0)
+        v_J = self.v_J(qdt0, qdt1)
+        a_J = self.a_J(qdt0, qdt1, qdt2)
+        return MobilizerKinematics(X_FM, S_FM, v_J, a_J)
+
 
 class TranslationalMobilizer(CustomMobilizer):
 
     nj = 1
     polynomials: MotionEquations = TranslationalPolynomials
+
+    def X_FM(self, qdt0: np.ndarray) -> np.ndarray:
+        z_dt0 = qdt0[0]
+        return spatial_motion_translation(np.array([0, 0, -z_dt0]))
+
+    def S_FM(self, qdt0: np.ndarray) -> np.ndarray:
+        return np.array([0, 0, 0, 0, 0, 1])[:, None]
+
+    def v_J(self, qdt0: np.ndarray, qdt1: np.ndarray) -> np.ndarray:
+        z_dt1 = qdt1[0]
+        return np.array([0, 0, 0, 0, 0, z_dt1])
+
+    def a_J(self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray) -> np.ndarray:
+        z_dt2 = qdt2[0]
+        return np.array([0, 0, 0, 0, 0, z_dt2])
+
+    def evaluate_kinematics(
+        self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
+    ) -> MobilizerKinematics:
+        X_FM = self.X_FM(qdt0)
+        S_FM = self.S_FM(qdt0)
+        v_J = self.v_J(qdt0, qdt1)
+        a_J = self.a_J(qdt0, qdt1, qdt2)
+        return MobilizerKinematics(X_FM, S_FM, v_J, a_J)
 
 
 class PlanarMobilizer(CustomMobilizer):

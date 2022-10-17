@@ -1,11 +1,11 @@
-from typing import Dict, List, NamedTuple, Optional
-from collections import defaultdict
 from functools import reduce
+from typing import Dict, List, NamedTuple, Tuple
 
 from uraeus.rnea.bodies import RigidBody, RigidBodyData
+from uraeus.rnea.graphs import Tree, contstruct_traversal_orders
 from uraeus.rnea.joints import (
     AbstractJoint,
-    JointData,
+    FunctionalJoint,
     JointConfigInputs,
     JointInstance,
     construct_functional_joint,
@@ -13,40 +13,7 @@ from uraeus.rnea.joints import (
     initialize_joint,
 )
 
-
-class Graph(object):
-    def __init__(self, name: str):
-
-        self.name = name
-        self.adj_list = defaultdict(list)
-
-    def add_edge(self, predecessor: str, successor: str) -> None:
-        self.adj_list[predecessor].append(successor)
-        self.adj_list[successor] = []
-
-
-class Tree(object):
-    def __init__(self, name: str, root: Optional[str] = "root"):
-
-        self.graph = Graph(name)
-        self.root = root
-        self.graph.adj_list[self.root] = []
-
-    @property
-    def adj_list(self):
-        return self.graph.adj_list
-
-    def add_edge(self, predecessor: str, successor: str) -> None:
-        if not self.check_if_node_exists(predecessor):
-            raise ValueError(f"Node '{predecessor}' is not in the tree!")
-
-        if self.check_if_node_exists(successor):
-            raise ValueError(f"Cannot add node '{successor}', as it already exists!")
-
-        self.graph.add_edge(predecessor, successor)
-
-    def check_if_node_exists(self, node: str) -> bool:
-        return node in self.adj_list
+import numpy as np
 
 
 class MultiBodyTree(object):
@@ -121,25 +88,45 @@ class MultiBodyTree(object):
         return joint_name in self.joints
 
 
-def construct_out_joints_map(
-    model_tree: MultiBodyTree,
-) -> Dict[str, List[JointInstance]]:
+class MultiBodyData(NamedTuple):
 
-    out_joints = {b: [] for b in model_tree.bodies}
-    for j in model_tree.joints.values():
-        out_joints[j.joint_data.predecessor.name].append(j)
-    return out_joints
+    joints: List[FunctionalJoint]
+    bodies_inertias: List[np.ndarray]
+    forward_traversal: List[Tuple[int, int, int]]
+    backward_traversal: List[Tuple[int, List[int]]]
+    qdt0_idx: np.ndarray
+    qdt1_idx: np.ndarray
 
 
-def contstruct_traversal_order(tree: MultiBodyTree):
-    bodies_indicies = {b: i for i, b in enumerate(tree.bodies)}
-    joints = [
-        (
-            j,
-            bodies_indicies[j.joint_data.predecessor.name],
-            bodies_indicies[j.joint_data.successor.name],
-        )
-        for j in tree.joints.values()
-    ]
-    joints = list(map(construct_functional_joint, joints))
-    return joints
+def construct_multibodydata(topology: MultiBodyTree) -> MultiBodyData:
+
+    func_joints = list(map(construct_functional_joint, topology.joints.values()))
+    bodies_inertias = [b.I for b in topology.bodies.values()]
+    forward_traversal, backward_traversal = contstruct_traversal_orders(topology.tree)
+    qdt0_idx = [0] + list(np.cumsum([j.nj for j in func_joints]))
+    qdt1_idx = qdt0_idx  # Equal each other for now. Later could be different.
+
+    data = MultiBodyData(
+        joints=func_joints,
+        bodies_inertias=bodies_inertias,
+        forward_traversal=forward_traversal,
+        backward_traversal=backward_traversal,
+        qdt0_idx=qdt0_idx,
+        qdt1_idx=qdt1_idx,
+    )
+
+    return data
+
+
+# =============================================================================
+# Obselete Code
+# =============================================================================
+
+# def construct_out_joints_map(
+#     model_tree: MultiBodyTree,
+# ) -> Dict[str, List[JointInstance]]:
+
+#     out_joints = {b: [] for b in model_tree.bodies}
+#     for j in model_tree.joints.values():
+#         out_joints[j.joint_data.predecessor.name].append(j)
+#     return out_joints

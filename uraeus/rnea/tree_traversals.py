@@ -1,36 +1,29 @@
 from functools import reduce
-from typing import Iterable, List, NamedTuple, Tuple, Dict
+from typing import Any, Callable, Iterable, List, NamedTuple, Tuple, Dict
 
 import numpy as np
 
 from uraeus.rnea.bodies import BodyKinematics, get_initialized_body_kinematics
 from uraeus.rnea.joints import (
-    AbstractJoint,
     FunctionalJoint,
-    JointData,
-    JointInstance,
+    JointFrames,
     JointKinematics,
-    JointVariables,
 )
 from uraeus.rnea.mobilizers import MobilizerForces
 from uraeus.rnea.algorithms_operations import (
-    eval_joint_force_components,
-    evaluate_joint_force_p1,
+    construct_mobilizer_force,
+    evaluate_joint_inertia_force,
     evaluate_successor_kinematics,
-    evaluate_joint_forces,
 )
 from uraeus.rnea.spatial_algebra import (
     get_orientation_matrix_from_transformation,
     motion_to_force_transform,
+    spatial_transform_transpose,
 )
-
-
-def split_coordinates(
-    joints: List[FunctionalJoint], qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
-) -> Iterable[Iterable[np.ndarray]]:
-    sections = np.cumsum(np.array([j.nj for j in joints]))
-    coordinates = zip(*(np.split(qd, sections[:-1]) for qd in (qdt0, qdt1, qdt2)))
-    return coordinates
+from uraeus.rnea.graphs import (
+    accumulate_leaf_to_root,
+    accumulate_root_to_leaf,
+)
 
 
 def eval_joints_kinematics(
@@ -40,14 +33,31 @@ def eval_joints_kinematics(
     return new_kin
 
 
+def edge_force_func(
+    successor_force: np.ndarray,
+    transforms: List[np.ndarray],
+    out_forces: List[np.ndarray],
+):
+    return successor_force + sum(map(np.dot, transforms, out_forces), np.zeros((6,)))
+
+
+root_to_leaf = accumulate_root_to_leaf(
+    get_initialized_body_kinematics(np.zeros((3,)), np.eye(3)),
+    evaluate_successor_kinematics,
+)
+
+
+joints_forces_accumulator = accumulate_leaf_to_root(edge_force_func)
+
+
 def base_to_tip(
     joints: List[FunctionalJoint],
     joints_coordinates: Iterable[Tuple[np.ndarray, np.ndarray, np.ndarray]],
-    dependency_order: List[Tuple[int, int, int]],
+    traversal_order: List[Tuple[int, int, int]],
 ) -> Tuple[List[BodyKinematics], List[JointKinematics]]:
 
     joints_kinematics = eval_joints_kinematics(joints, joints_coordinates)
-    bodies_kinematics = root_to_leaf(joints_kinematics, dependency_order)
+    bodies_kinematics = root_to_leaf(joints_kinematics, traversal_order)
 
     return (bodies_kinematics, joints_kinematics)
 
@@ -55,79 +65,73 @@ def base_to_tip(
 def tip_to_base(
     joints: List[FunctionalJoint],
     joints_kinematics: List[JointKinematics],
-    dependency_order: List[Tuple[int, List[int]]],
+    traversal_order: List[Tuple[int, List[int]]],
     bodies_kinematics: List[BodyKinematics],
     bodies_inertias: List[np.ndarray],
     external_forces: List[List[np.ndarray]],
-) -> Tuple[np.ndarray, ...]:
+) -> List[np.ndarray]:
 
     # Evaluate inertia forces and external forces on bodies
-    bodies_forces = eval_bodies_forces(
-        bodies_kinematics, bodies_inertias, external_forces
+    bodies_forces = list(
+        map(
+            evaluate_joint_inertia_force,
+            bodies_kinematics,
+            bodies_inertias,
+            external_forces,
+        )
     )
+
+    # reversed_joints_kin = list(reversed(joints_kinematics))
 
     # Extract joints' transforms from joints' kinematics
-    joints_transforms = [j.X_PS for j in reversed(joints_kinematics)]
-    joints_frames = [j.frames for j in joints]
-
-    # Traverse the tree tip-to-base and Evaluate joints' forces
-    joints_forces = leaf_to_root(bodies_forces, joints_transforms, dependency_order)
-
-    sorted_bodies_kin = reversed(bodies_kinematics)
-    # [bodies_kinematics[i[0]] for i in dependency_order]
-
-    args = (
-        joints_forces,
-        reversed(joints_frames),
-        reversed(joints_kinematics),
-        sorted_bodies_kin,
-    )
-
-    force_instances = reversed(list(map(eval_joint_force_components, *args)))
-
-    return list(force_instances)
-
-
-def root_to_leaf(
-    joints_kinematics: List[JointKinematics],
-    dependency_order: List[Tuple[int, int, int]],
-):
-    bodies_kin = [
-        get_initialized_body_kinematics(
-            np.zeros((3,)),
-            np.eye(3),
-        )
+    # joints_frames = [j.frames for j in joints]
+    # joints_transforms = [j.X_PS for j in joints_kinematics]
+    # forces_transforms = list(map(motion_to_force_transform, joints_transforms))
+    forces_transforms = [
+        motion_to_force_transform(j.X_PS) for j in reversed(joints_kinematics)
     ]
 
-    for successor_index, joint_index, predecessor_index in dependency_order:
-        suc_kin = evaluate_successor_kinematics(
-            bodies_kin[predecessor_index], joints_kinematics[joint_index]
-        )
-        bodies_kin.append(suc_kin)
-    return bodies_kin
-
-
-def leaf_to_root(
-    bodies_forces: List[np.ndarray],
-    joints_transforms: List[np.ndarray],
-    dependency_order: List[Tuple[int, List[int]]],
-) -> List[np.ndarray]:
-    joints_transforms = np.array(
-        list(map(motion_to_force_transform, joints_transforms))
+    # Traverse the tree tip-to-base and Evaluate joints' forces
+    joints_forces = reversed(
+        joints_forces_accumulator(bodies_forces, forces_transforms, traversal_order)
     )
-    forces = []
-    for successor_index, sub_joints in dependency_order[:-1]:
-        sub_joints_X_PS = [joints_transforms[i] for i in sub_joints]
-        sub_joints_fi_S = [forces[i] for i in sub_joints]
-        sub_joints_forces = sum(
-            map(np.dot, sub_joints_X_PS, sub_joints_fi_S), np.zeros((6,))
-        )
-        joint_force = bodies_forces[successor_index] + sub_joints_forces
-        forces.append(joint_force)
 
-    # print("joint_forces = ", forces[-1])
-    # print("bodies_forces = ", bodies_forces[1])
-    return forces
+    return list(joints_forces)
+
+
+def evaluate_tau(
+    joints_frames: List[JointFrames],
+    joints_kinematics: List[JointKinematics],
+    joints_forces: List[np.ndarray],
+) -> np.ndarray:
+    forces_transforms_X_MS = map(
+        motion_to_force_transform,
+        map(spatial_transform_transpose, [j.X_SM for j in joints_frames]),
+    )
+    fi_Ms = map(np.dot, forces_transforms_X_MS, joints_forces)
+    taus = map(np.dot, [j.S_FM.T for j in joints_kinematics], fi_Ms)
+    tau = np.hstack(list(taus))
+    # tau = np.hstack([(j.S_FM.T @ fi_M) for j, fi_M in zip(joints_kinematics, fi_Ms)])
+
+    return tau
+
+
+def extract_mobilizer_forces(
+    joints_forces: List[np.ndarray],
+    joints_frames: List[JointFrames],
+    joints_kinematics: List[JointKinematics],
+    bodies_kinematics: List[BodyKinematics],
+):
+    force_instances = list(
+        map(
+            construct_mobilizer_force,
+            joints_forces,
+            joints_frames,
+            joints_kinematics,
+            bodies_kinematics,
+        )
+    )
+    return force_instances
 
 
 def eval_bodies_forces(
@@ -135,8 +139,15 @@ def eval_bodies_forces(
     bodies_inertias: List[np.ndarray],
     external_forces: List[List[np.ndarray]],
 ):
-    arguments = (bodies_kinematics, bodies_inertias, external_forces)
-    return list(map(evaluate_joint_force_p1, *arguments))
+    forces = list(
+        map(
+            evaluate_joint_inertia_force,
+            bodies_kinematics,
+            bodies_inertias,
+            external_forces,
+        )
+    )
+    return forces
 
 
 def extract_state_vectors(
@@ -160,3 +171,43 @@ def extract_reaction_forces(joints_forces: List[MobilizerForces]) -> np.ndarray:
 
     rct_vector = np.hstack([j.fc_G for j in joints_forces])
     return rct_vector
+
+
+# =============================================================================
+# Obselete Code
+# =============================================================================
+# def root_to_leaf1(
+#     joints_kinematics: List[JointKinematics],
+#     traversal_order: List[Tuple[int, int, int]],
+# ):
+#     bodies_kin = [
+#         get_initialized_body_kinematics(
+#             np.zeros((3,)),
+#             np.eye(3),
+#         )
+#     ]
+
+#     for _, joint_index, predecessor_index in traversal_order:
+#         suc_kin = evaluate_successor_kinematics(
+#             bodies_kin[predecessor_index], joints_kinematics[joint_index]
+#         )
+#         bodies_kin.append(suc_kin)
+#     return bodies_kin
+
+# def leaf_to_root1(
+#     bodies_forces: List[np.ndarray],
+#     forces_transforms: List[np.ndarray],
+#     traversal_order: List[Tuple[int, List[int]]],
+# ) -> List[np.ndarray]:
+
+#     forces = []
+#     for successor_index, sub_joints in traversal_order[:-1]:
+#         sub_joints_X_PS = [forces_transforms[i] for i in sub_joints]
+#         sub_joints_fi_S = [forces[i] for i in sub_joints]
+#         sub_joints_forces = sum(
+#             map(np.dot, sub_joints_X_PS, sub_joints_fi_S), np.zeros((6,))
+#         )
+#         joint_force = bodies_forces[successor_index] + sub_joints_forces
+#         forces.append(joint_force)
+
+#     return forces

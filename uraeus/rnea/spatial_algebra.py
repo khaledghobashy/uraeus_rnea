@@ -1,20 +1,59 @@
 # import jax
+from typing import Tuple
 import jax.numpy as jnp
 import numpy as np
 
 
+def vsplit(arr: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """Split an 2D array `arr` into two equally sized sections vertically.
+    This mimics the `np.vspilt(arr, 2)`, but uses a smart `reshape` trick,
+    avoiding expensive copy operations.
+
+    Parameters
+    ----------
+    arr : np.ndarray
+        2D numpy array
+
+    Returns
+    -------
+    Tuple[np.ndarray, np.ndarray]
+        A tuple of the two
+    """
+    top_half, low_half = arr.reshape(2, -1, arr.shape[-1])
+    return top_half, low_half
+
+
+def hsplit(arr: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """Split an 2D array `arr` into two equally sized sections horizontally.
+    This mimics the `np.hspilt(arr, 2)`, but uses a smart `.reshape` trick,
+    avoiding expensive copy operations.
+
+    Parameters
+    ----------
+    arr : np.ndarray
+        2D numpy array
+
+    Returns
+    -------
+    Tuple[np.ndarray, np.ndarray]
+        A tuple of the two
+    """
+    top_half, low_half = arr.T.reshape(2, -1, arr.shape[-1])
+    return top_half.T, low_half.T
+
+
 def skew_matrix(v: np.ndarray) -> np.ndarray:
-    """_summary_
+    """Create a skew-matrix out of the given cartesian vector.
 
     Parameters
     ----------
     v : np.ndarray
-        _description_
+        A (3,) numpy array representing a cartesian vector.
 
     Returns
     -------
     np.ndarray
-        _description_
+        A (3, 3) np.array
     """
 
     x, y, z = v
@@ -24,7 +63,7 @@ def skew_matrix(v: np.ndarray) -> np.ndarray:
 
 def spatial_skew(v: np.ndarray) -> np.ndarray:
 
-    orient_elements, trans_elements = np.split(v, 2)
+    orient_elements, trans_elements = v.reshape(2, -1)
 
     b00 = skew_matrix(orient_elements)
     b01 = np.zeros((3, 3))
@@ -106,9 +145,9 @@ def spatial_force_transformation(R_PS: np.ndarray, p_PS: np.ndarray) -> np.ndarr
 
 
 def motion_to_force_transform(X_PS: np.ndarray) -> np.ndarray:
-    left_half, right_half = np.hsplit(X_PS, 2)
-    b00, b10 = np.vsplit(left_half, 2)
-    b01, b11 = np.vsplit(right_half, 2)
+    left_half, right_half = hsplit(X_PS)
+    b00, b10 = vsplit(left_half)
+    b01, b11 = vsplit(right_half)
 
     X_f_PS = np.vstack(
         [
@@ -122,10 +161,9 @@ def motion_to_force_transform(X_PS: np.ndarray) -> np.ndarray:
 
 def spatial_transform_transpose(X_PS: np.ndarray) -> np.ndarray:
 
-    left_half, right_half = np.hsplit(X_PS, 2)
-    b00, b10 = np.vsplit(left_half, 2)
-    b01, b11 = np.vsplit(right_half, 2)
-
+    left_half, right_half = hsplit(X_PS)
+    b00, b10 = vsplit(left_half)
+    b01, b11 = vsplit(right_half)
     X_SP = np.vstack(
         [
             np.hstack([b00.T, b01.T]),
@@ -149,8 +187,8 @@ def vector_from_skew(skew_m: np.ndarray) -> np.ndarray:
 
 def get_position_from_transformation(X_PS: np.ndarray) -> np.ndarray:
 
-    left_half, _ = np.hsplit(X_PS, 2)
-    b00, b10 = np.vsplit(left_half, 2)
+    left_half, _ = hsplit(X_PS)
+    b00, b10 = vsplit(left_half)
 
     skewed_matrix = b00.T @ b10
     p_PS = vector_from_skew(-skewed_matrix)
@@ -173,8 +211,8 @@ def get_euler_angles_from_rotation(R_PS: np.ndarray) -> np.ndarray:
 
 
 def get_euler_angles_from_transformation(X_PS: np.ndarray) -> np.ndarray:
-    left_half, _ = np.hsplit(X_PS, 2)
-    b00, _ = np.vsplit(left_half, 2)
+    left_half, _ = hsplit(X_PS)
+    b00, _ = vsplit(left_half)
 
     e_PS = get_euler_angles_from_rotation(b00)
 
@@ -183,8 +221,8 @@ def get_euler_angles_from_transformation(X_PS: np.ndarray) -> np.ndarray:
 
 def get_pose_from_transformation(X_PS: np.ndarray) -> np.ndarray:
 
-    left_half, _ = np.hsplit(X_PS, 2)
-    b00, b10 = np.vsplit(left_half, 2)
+    left_half, _ = hsplit(X_PS)
+    b00, b10 = vsplit(left_half)
 
     skewed_matrix = b00.T @ b10
     p_PS = vector_from_skew(-skewed_matrix)
@@ -197,7 +235,7 @@ def get_pose_from_transformation(X_PS: np.ndarray) -> np.ndarray:
 
 def get_orientation_matrix_from_transformation(X_PS: np.ndarray) -> np.ndarray:
 
-    left_half, _ = np.hsplit(X_PS, 2)
-    R_PS, _ = np.vsplit(left_half, 2)
+    left_half, _ = hsplit(X_PS)
+    R_PS, _ = vsplit(left_half)
 
     return R_PS

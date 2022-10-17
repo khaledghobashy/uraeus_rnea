@@ -134,7 +134,7 @@ class FunctionalJoint(NamedTuple):
 
     def evaluate_kinematics(
         self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
-    ) -> MobilizerKinematics:
+    ) -> JointKinematics:
         mobilizer_kinematics = self.mobilizer.evaluate_kinematics(qdt0, qdt1, qdt2)
         joint_kinematics = evaluate_joint_kinematics(mobilizer_kinematics, self.frames)
         return joint_kinematics
