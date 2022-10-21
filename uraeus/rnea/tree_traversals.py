@@ -63,7 +63,6 @@ def base_to_tip(
 
 
 def tip_to_base(
-    joints: List[FunctionalJoint],
     joints_kinematics: List[JointKinematics],
     traversal_order: List[Tuple[int, List[int]]],
     bodies_kinematics: List[BodyKinematics],
@@ -81,22 +80,19 @@ def tip_to_base(
         )
     )
 
-    # reversed_joints_kin = list(reversed(joints_kinematics))
-
     # Extract joints' transforms from joints' kinematics
-    # joints_frames = [j.frames for j in joints]
-    # joints_transforms = [j.X_PS for j in joints_kinematics]
-    # forces_transforms = list(map(motion_to_force_transform, joints_transforms))
     forces_transforms = [
         motion_to_force_transform(j.X_PS) for j in reversed(joints_kinematics)
     ]
 
     # Traverse the tree tip-to-base and Evaluate joints' forces
-    joints_forces = reversed(
-        joints_forces_accumulator(bodies_forces, forces_transforms, traversal_order)
+    joints_forces = list(
+        reversed(
+            joints_forces_accumulator(bodies_forces, forces_transforms, traversal_order)
+        )
     )
 
-    return list(joints_forces)
+    return joints_forces
 
 
 def evaluate_tau(

@@ -57,7 +57,7 @@ def evaluate_joint_inertia_force(
     )
     R_BG = get_orientation_matrix_from_transformation(successor_kin.X_BG)
     E_BG = spatial_motion_rotation(R_BG)
-    fe_S = E_BG @ sum(external_forces, np.zeros((6,)))
+    fe_S = motion_to_force_transform(E_BG) @ sum(external_forces, np.zeros((6,)))
 
     return fb_S - fe_S
 
