@@ -64,7 +64,6 @@ def inverse_dynamics_call(
     )
 
     joints_forces = tip_to_base(
-        joints=func_joints,
         joints_kinematics=joints_kin,
         traversal_order=backward_traversal,
         bodies_kinematics=bodies_kin,
@@ -84,7 +83,8 @@ def evaluate_C(
 ) -> IDCallRes:
 
     qdt2 = np.zeros_like(qdt1)
-    return inverse_dynamics_call(tree_data, external_forces, qdt0, qdt1, qdt2)
+    res = inverse_dynamics_call(tree_data, external_forces, qdt0, qdt1, qdt2)
+    return res
 
 
 def forward_dynamics_call(
@@ -157,7 +157,9 @@ class JointInertiaMatrixOperations(NamedTuple):
         forward_traversal = tree_data.forward_traversal
         backward_traversal = tree_data.backward_traversal
         joints_frames = [j.frames for j in tree_data.joints]
-        forces_transforms = [motion_to_force_transform(j.X_PS) for j in joints_kin]
+        forces_transforms = [
+            motion_to_force_transform(j.X_PS) for j in reversed(joints_kin)
+        ]
 
         bodies_acc = node_acceleration_accumulator(joints_kin, forward_traversal)
         bodies_forces = list(map(np.dot, tree_data.bodies_inertias, bodies_acc))
@@ -173,33 +175,33 @@ class JointInertiaMatrixOperations(NamedTuple):
 # =============================================================================
 # Obselete
 # =============================================================================
-# def evaluate_H(
-#     tree_data: MultiBodyData,
-#     external_forces: List[List[np.ndarray]],
-#     qdt0: np.ndarray,
-#     qdt1: np.ndarray,
-#     C_vec: np.ndarray,
-# ) -> np.ndarray:
+def evaluate_H(
+    tree_data: MultiBodyData,
+    external_forces: List[List[np.ndarray]],
+    qdt0: np.ndarray,
+    qdt1: np.ndarray,
+    C_vec: np.ndarray,
+) -> np.ndarray:
 
-#     boolean_deltas = np.eye(len(qdt0))
-#     partial_func = partial(
-#         inverse_dynamics_call,
-#         tree_data,
-#         external_forces,
-#         qdt0,
-#         qdt1,
-#     )
-#     H_columns = map(partial_func, boolean_deltas)
-#     H_columns = map(sub, H_columns, repeat(C_vec, len(qdt0)))
-#     H_matrix = np.column_stack(list(H_columns))
+    boolean_deltas = np.eye(len(qdt0))
+    partial_func = partial(
+        inverse_dynamics_call,
+        tree_data,
+        external_forces,
+        qdt0,
+        qdt1,
+    )
+    # H_columns = map(partial_func, boolean_deltas)
+    # H_columns = map(sub, H_columns, repeat(C_vec, len(qdt0)))
+    # H_matrix = np.column_stack(list(H_columns))
 
-#     # H_columns = [
-#     #     (inverse_dynamics_call(tree_data, external_forces, qdt0, qdt1, col) - C_vec)
-#     #     for col in boolean_deltas
-#     # ]
-#     # H_matrix = np.column_stack(H_columns)
+    H_columns = [
+        (inverse_dynamics_call(tree_data, external_forces, qdt0, qdt1, col).tau - C_vec)
+        for col in boolean_deltas
+    ]
+    H_matrix = np.column_stack(H_columns)
 
-#     return H_matrix
+    return H_matrix
 
 
 # def evaluate_H2(
