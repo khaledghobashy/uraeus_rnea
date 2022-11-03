@@ -9,8 +9,13 @@ from uraeus.rnea.bodies import BodyKinematics
 from uraeus.rnea.joints import (
     JointKinematics,
 )
-from uraeus.rnea.spatial_algebra import motion_to_force_transform
-from uraeus.rnea.topologies import MultiBodyData
+from uraeus.rnea.spatial_algebra import (
+    get_orientation_matrix_from_transformation,
+    motion_to_force_transform,
+    spatial_motion_rotation,
+    spatial_transform_transpose,
+)
+from uraeus.rnea.topologies import HybridDynamicsData, MultiBodyData
 from uraeus.rnea.graphs import accumulate_root_to_leaf
 from uraeus.rnea.tree_traversals import (
     base_to_tip,
@@ -172,36 +177,120 @@ class JointInertiaMatrixOperations(NamedTuple):
         return tau
 
 
+class HybridDynamics(object):
+    def evaluate_C(
+        self,
+        hybrid_data: HybridDynamicsData,
+        external_forces: List[List[np.ndarray]],
+        qdt0: np.ndarray,
+        qdt1: np.ndarray,
+        qdt2_id: np.ndarray,
+    ) -> IDCallRes:
+
+        n_fd = hybrid_data.n_fd
+        Q = hybrid_data.permutation_matrix
+        qdt2 = Q.T @ np.hstack([np.zeros((n_fd,)), qdt2_id])
+
+        return inverse_dynamics_call(
+            hybrid_data.tree_data, external_forces, qdt0, qdt1, qdt2
+        )
+
+    def forward_dynamics_call(
+        self,
+        hybrid_data: HybridDynamicsData,
+        external_forces: List[List[np.ndarray]],
+        qdt0: np.ndarray,
+        qdt1: np.ndarray,
+        qdt2_id: np.ndarray,
+        tau_fd: np.ndarray,
+    ) -> np.ndarray:
+
+        n_fd = hybrid_data.n_fd
+        Q = hybrid_data.permutation_matrix
+
+        C, _, joints_kin, _ = self.evaluate_C(
+            hybrid_data, external_forces, qdt0, qdt1, qdt2_id
+        )
+        H = JointInertiaMatrixOperations.construct_H(
+            hybrid_data.tree_data, joints_kin, qdt0
+        )
+
+        H_fd = (Q @ H @ Q.T)[:n_fd, :n_fd]
+        C_fd = (Q @ C)[:n_fd]
+
+        rhs = tau_fd - C_fd
+        qdt2_fd = np.linalg.solve(H_fd, rhs)
+        return qdt2_fd
+
+
+def _helper(predecessor_X_GB, joint):
+    X_GB = predecessor_X_GB @ joint.X_PS
+    X_BG = spatial_transform_transpose(X_GB)
+    R_BG = get_orientation_matrix_from_transformation(X_BG)
+    E_BG = spatial_motion_rotation(R_BG)
+    return E_BG
+
+
+_bodies_config_func = accumulate_root_to_leaf(np.eye(6), _helper)
+
+
+def ext_forces_to_gen_forces(
+    tree_data: MultiBodyData,
+    joints_kin: List[JointKinematics],
+    ext_forces: List[List[np.ndarray]],
+):
+    bodies_E_BG = _bodies_config_func(joints_kin, tree_data.forward_traversal)
+    bodies_E_BG_f = map(motion_to_force_transform, bodies_E_BG)
+    bodies_fe_S = map(
+        np.dot, bodies_E_BG_f, [sum(forces, np.zeros((6,))) for forces in ext_forces]
+    )
+    forces_transforms = [
+        motion_to_force_transform(j.X_PS) for j in reversed(joints_kin)
+    ]
+    joints_forces = list(
+        reversed(
+            joints_forces_accumulator(
+                list(bodies_fe_S), forces_transforms, tree_data.backward_traversal
+            )
+        )
+    )
+
+    joints_frames = [j.frames for j in tree_data.joints]
+
+    tau = evaluate_tau(joints_frames, joints_kin, joints_forces)
+    return tau
+
+
 # =============================================================================
 # Obselete
 # =============================================================================
-def evaluate_H(
-    tree_data: MultiBodyData,
-    external_forces: List[List[np.ndarray]],
-    qdt0: np.ndarray,
-    qdt1: np.ndarray,
-    C_vec: np.ndarray,
-) -> np.ndarray:
+# def evaluate_H(
+#     tree_data: MultiBodyData,
+#     external_forces: List[List[np.ndarray]],
+#     qdt0: np.ndarray,
+#     qdt1: np.ndarray,
+#     C_vec: np.ndarray,
+# ) -> np.ndarray:
 
-    boolean_deltas = np.eye(len(qdt0))
-    partial_func = partial(
-        inverse_dynamics_call,
-        tree_data,
-        external_forces,
-        qdt0,
-        qdt1,
-    )
-    # H_columns = map(partial_func, boolean_deltas)
-    # H_columns = map(sub, H_columns, repeat(C_vec, len(qdt0)))
-    # H_matrix = np.column_stack(list(H_columns))
+#     boolean_deltas = np.eye(len(qdt0))
+#     partial_func = partial(
+#         inverse_dynamics_call,
+#         tree_data,
+#         external_forces,
+#         qdt0,
+#         qdt1,
+#     )
+#     # H_columns = map(partial_func, boolean_deltas)
+#     # H_columns = map(sub, H_columns, repeat(C_vec, len(qdt0)))
+#     # H_matrix = np.column_stack(list(H_columns))
 
-    H_columns = [
-        (inverse_dynamics_call(tree_data, external_forces, qdt0, qdt1, col).tau - C_vec)
-        for col in boolean_deltas
-    ]
-    H_matrix = np.column_stack(H_columns)
+#     H_columns = [
+#         (inverse_dynamics_call(tree_data, external_forces, qdt0, qdt1, col).tau - C_vec)
+#         for col in boolean_deltas
+#     ]
+#     H_matrix = np.column_stack(H_columns)
 
-    return H_matrix
+#     return H_matrix
 
 
 # def evaluate_H2(

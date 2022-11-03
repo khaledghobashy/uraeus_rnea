@@ -98,6 +98,36 @@ class MultiBodyData(NamedTuple):
     qdt1_idx: np.ndarray
 
 
+class HybridDynamicsData(NamedTuple):
+    tree_data: MultiBodyData
+    permutation_matrix: np.ndarray
+    n_fd: int
+
+
+def construct_permutation_matrix(dof: int, id_indices: List[int]) -> np.ndarray:
+    permutation = [i for i in range(dof) if i not in id_indices]
+    permutation += id_indices
+    mat = np.zeros((dof, dof))
+    mat[np.arange(0, dof), permutation] = 1
+    return mat
+
+
+def construct_hybriddynamics_data(
+    tree_data: MultiBodyData, id_coordintaes: np.ndarray
+) -> HybridDynamicsData:
+    n_dof = sum([j.nj for j in tree_data.joints])
+    n_id = len(id_coordintaes)
+    n_fd = n_dof - n_id
+    Q = construct_permutation_matrix(n_dof, id_coordintaes)
+
+    data = HybridDynamicsData(
+        tree_data=tree_data,
+        permutation_matrix=Q,
+        n_fd=n_fd,
+    )
+    return data
+
+
 def construct_multibodydata(topology: MultiBodyTree) -> MultiBodyData:
 
     func_joints = list(map(construct_functional_joint, topology.joints.values()))
