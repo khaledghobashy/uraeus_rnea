@@ -85,22 +85,28 @@ class CustomMobilizer(AbstractMobilizer):
         orientation, _ = np.split(pose_dt0, 2)
         phi, theta, psi = orientation
 
+        R_x = rot_x(phi)
         R_y = rot_y(theta)
-        R_z = rot_z(psi)
+        # R_z = rot_z(psi)
 
         # z-column where the 1st rotation, `psi`, took place, in frame F
-        z_col = np.array([0, 0, 1])
+        # z_col = np.array([0, 0, 1])
         # y-column where the 2nd rotation, `theta`, took place, in frame F
-        y_col = R_z @ np.array([0, 1, 0])
+        # y_col = R_z @ np.array([0, 1, 0])
         # x-column where the 3rd rotation, `phi`, took place, in frame F
-        x_col = R_z @ R_y @ np.array([1, 0, 0])
+        # x_col = R_z @ R_y @ np.array([1, 0, 0])
 
         # transformation matrix from orientation-parameters 1st derivative to
         # the relative angular velocities.
         # (The unit vectors where the rotations took place around,
         # expressed in frame F)
 
-        W_FM_dt0 = np.column_stack([x_col, y_col, z_col])
+        a1 = np.array([1, 0, 0])
+        a2 = R_x @ np.array([0, 1, 0])
+        a3 = R_x @ R_y @ np.array([0, 0, 1])
+
+        # W_FM_dt0 = np.column_stack([x_col, y_col, z_col])
+        W_FM_dt0 = np.column_stack([a1, a2, a3])
         return W_FM_dt0
 
     def W_FM_dt1(self, W_FM_dt0: np.ndarray, pose_dt1: np.ndarray) -> np.ndarray:
@@ -110,12 +116,23 @@ class CustomMobilizer(AbstractMobilizer):
         orientation_dt1, _ = np.split(pose_dt1, 2)
         phi_dt1, theta_dt1, psi_dt1 = orientation_dt1
 
-        omega_1 = psi_dt1 * z_col_dt0
+        # omega_1 = psi_dt1 * z_col_dt0
+        # omega_2 = omega_1 + (theta_dt1 * y_col_dt0)
+
+        # z_col_dt1 = np.zeros((3,))
+        # y_col_dt1 = skew_matrix(omega_1.flatten()) @ y_col_dt0
+        # x_col_dt1 = skew_matrix(omega_2.flatten()) @ x_col_dt0
+
+        # W_FM_dt1 = np.column_stack([x_col_dt1, y_col_dt1, z_col_dt1])
+
+        # omega_1 = W_FM_dt0 @ np.array([phi_dt1, 0, 0])
+        # omega_2 = W_FM_dt0 @ np.array([phi_dt1, theta_dt1, 0])
+        omega_1 = phi_dt1 * x_col_dt0
         omega_2 = omega_1 + (theta_dt1 * y_col_dt0)
 
-        z_col_dt1 = np.zeros((3,))
+        x_col_dt1 = np.zeros((3,))
         y_col_dt1 = skew_matrix(omega_1.flatten()) @ y_col_dt0
-        x_col_dt1 = skew_matrix(omega_2.flatten()) @ x_col_dt0
+        z_col_dt1 = skew_matrix(omega_2.flatten()) @ z_col_dt0
 
         W_FM_dt1 = np.column_stack([x_col_dt1, y_col_dt1, z_col_dt1])
 
