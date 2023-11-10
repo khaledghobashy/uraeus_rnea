@@ -1,5 +1,4 @@
 *__pycache__
-*.devcontainer
 *.ipynb_checkpoints
 *.egg-info
 */**/_temp
@@ -7,3 +6,4 @@
 */**/models
 */**/tests
 uraeus/rnea/utils
+.vscode
