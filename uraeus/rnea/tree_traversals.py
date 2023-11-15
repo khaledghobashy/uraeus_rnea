@@ -1,6 +1,8 @@
-from functools import reduce
+from functools import reduce, partial
 from typing import Any, Callable, Iterable, List, NamedTuple, Tuple, Dict
 
+import jax
+import jax.numpy as jnp
 import numpy as np
 
 from uraeus.rnea.bodies import BodyKinematics, get_initialized_body_kinematics
@@ -16,7 +18,6 @@ from uraeus.rnea.algorithms_operations import (
     evaluate_successor_kinematics,
 )
 from uraeus.rnea.spatial_algebra import (
-    get_orientation_matrix_from_transformation,
     motion_to_force_transform,
     spatial_transform_transpose,
 )
@@ -26,10 +27,17 @@ from uraeus.rnea.graphs import (
 )
 
 
+@partial(jax.jit, static_argnums=(0,))
 def eval_joints_kinematics(
-    joints: List[FunctionalJoint], coordinates: Iterable[Iterable[np.ndarray]]
+    joints: tuple[FunctionalJoint, ...], coordinates: tuple[tuple[np.ndarray, ...], ...]
 ):
-    new_kin = [j.evaluate_kinematics(*coords) for j, coords in zip(joints, coordinates)]
+    new_kin = tuple(
+        j.evaluate_kinematics(*coords) for j, coords in zip(joints, coordinates)
+    )
+    # new_kin = []
+    # for i in range(len(joints)):
+    #     qdt0, qdt1, qdt2 = coordinates[i]
+    #     new_kin.append(joints[i].evaluate_kinematics(qdt0, qdt1, qdt2))
     return new_kin
 
 
@@ -38,7 +46,7 @@ def edge_force_func(
     transforms: List[np.ndarray],
     out_forces: List[np.ndarray],
 ):
-    return successor_force + sum(map(np.dot, transforms, out_forces), np.zeros((6,)))
+    return successor_force + sum(map(jnp.dot, transforms, out_forces), np.zeros((6,)))
 
 
 root_to_leaf = accumulate_root_to_leaf(
@@ -50,14 +58,14 @@ root_to_leaf = accumulate_root_to_leaf(
 joints_forces_accumulator = accumulate_leaf_to_root(edge_force_func)
 
 
+@partial(jax.jit, static_argnums=(0, 2))
 def base_to_tip(
-    joints: List[FunctionalJoint],
-    joints_coordinates: Iterable[Tuple[np.ndarray, np.ndarray, np.ndarray]],
-    traversal_order: List[Tuple[int, int, int]],
-) -> Tuple[List[BodyKinematics], List[JointKinematics]]:
-
+    joints: Tuple[FunctionalJoint, ...],
+    joints_coordinates: Tuple[Tuple[np.ndarray, np.ndarray, np.ndarray], ...],
+    traversal_order: Tuple[Tuple[int, int, int], ...],
+) -> Tuple[Tuple[BodyKinematics], Tuple[JointKinematics]]:
     joints_kinematics = eval_joints_kinematics(joints, joints_coordinates)
-    bodies_kinematics = root_to_leaf(joints_kinematics, traversal_order)
+    bodies_kinematics = root_to_leaf(traversal_order, joints_kinematics)
 
     return (bodies_kinematics, joints_kinematics)
 
@@ -69,7 +77,6 @@ def tip_to_base(
     bodies_inertias: List[np.ndarray],
     external_forces: List[List[np.ndarray]],
 ) -> List[np.ndarray]:
-
     # Evaluate inertia forces and external forces on bodies
     bodies_forces = list(
         map(
@@ -95,6 +102,10 @@ def tip_to_base(
     return joints_forces
 
 
+dot = jax.vmap(jnp.dot)
+
+
+@jax.jit
 def evaluate_tau(
     joints_frames: List[JointFrames],
     joints_kinematics: List[JointKinematics],
@@ -104,9 +115,11 @@ def evaluate_tau(
         motion_to_force_transform,
         map(spatial_transform_transpose, [j.X_SM for j in joints_frames]),
     )
-    fi_Ms = map(np.dot, forces_transforms_X_MS, joints_forces)
-    taus = map(np.dot, [j.S_FM.T for j in joints_kinematics], fi_Ms)
-    tau = np.hstack(list(taus))
+    # fi_Ms = map(jnp.dot, forces_transforms_X_MS, joints_forces)
+    fi_Ms = dot(jnp.stack(list(forces_transforms_X_MS)), jnp.stack(joints_forces))
+    taus = map(jnp.dot, [j.S_FM.T for j in joints_kinematics], fi_Ms)
+    # taus = dot(jnp.stack([j.S_FM.T for j in joints_kinematics]), fi_Ms)
+    tau = jnp.hstack(list(taus))
     # tau = np.hstack([(j.S_FM.T @ fi_M) for j, fi_M in zip(joints_kinematics, fi_Ms)])
 
     return tau
@@ -149,7 +162,6 @@ def eval_bodies_forces(
 def extract_state_vectors(
     system_kinematics: List[BodyKinematics],
 ) -> Tuple[np.ndarray, ...]:
-
     pos_vector = np.hstack([b.p_GB for b in system_kinematics])
     vel_vector = np.hstack([b.v_G for b in system_kinematics])
     acc_vector = np.hstack([b.a_G for b in system_kinematics])
@@ -158,13 +170,11 @@ def extract_state_vectors(
 
 
 def extract_generalized_forces(joints_forces: List[MobilizerForces]) -> np.ndarray:
-
     tau_vector = np.hstack([j.tau for j in joints_forces])
     return tau_vector
 
 
 def extract_reaction_forces(joints_forces: List[MobilizerForces]) -> np.ndarray:
-
     rct_vector = np.hstack([j.fc_G for j in joints_forces])
     return rct_vector
 

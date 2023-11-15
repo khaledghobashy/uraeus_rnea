@@ -1,6 +1,10 @@
 """ _ """
 
 from typing import Callable, NamedTuple
+from functools import partial
+
+import jax
+import jax.numpy as jnp
 import numpy as np
 
 from uraeus.rnea.spatial_algebra import (
@@ -38,7 +42,6 @@ class MobilizerForces(NamedTuple):
 
 
 class AbstractMobilizer(NamedTuple):
-
     nj: int = None
 
     def X_FM(self, qdt0: np.ndarray) -> np.ndarray:
@@ -66,23 +69,23 @@ class AbstractMobilizer(NamedTuple):
 
 
 class CustomMobilizer(AbstractMobilizer):
-
     polynomials: MotionEquations
 
+    @partial(jax.jit, static_argnums=(0,))
     def X_FM(self, qdt0: np.ndarray) -> np.ndarray:
         pose_dt0 = self.polynomials.pose_polynomials(qdt0)
-        orientation, location = np.split(pose_dt0, 2)
+        orientation, location = jnp.split(pose_dt0, 2)
         phi, theta, psi = orientation
         R_FM = rot_z(psi) @ rot_y(theta) @ rot_x(phi)
         return spatial_motion_transformation(R_FM, -R_FM.T @ location)
 
+    @partial(jax.jit, static_argnums=(0,))
     def W_FM_dt0(self, qdt0: np.ndarray) -> np.ndarray:
-
         # Getting the position-level spatial coordinates
         pose_dt0 = self.polynomials.pose_polynomials(qdt0)
 
         # Getting the orientaion vector from the 6D spatial vector
-        orientation, _ = np.split(pose_dt0, 2)
+        orientation, _ = jnp.split(pose_dt0, 2)
         phi, theta, psi = orientation
 
         R_x = rot_x(phi)
@@ -106,14 +109,14 @@ class CustomMobilizer(AbstractMobilizer):
         a3 = R_x @ R_y @ np.array([0, 0, 1])
 
         # W_FM_dt0 = np.column_stack([x_col, y_col, z_col])
-        W_FM_dt0 = np.column_stack([a1, a2, a3])
+        W_FM_dt0 = jnp.column_stack([a1, a2, a3])
         return W_FM_dt0
 
+    @partial(jax.jit, static_argnums=(0,))
     def W_FM_dt1(self, W_FM_dt0: np.ndarray, pose_dt1: np.ndarray) -> np.ndarray:
+        x_col_dt0, y_col_dt0, z_col_dt0 = jnp.hsplit(W_FM_dt0, 3)
 
-        x_col_dt0, y_col_dt0, z_col_dt0 = np.hsplit(W_FM_dt0, 3)
-
-        orientation_dt1, _ = np.split(pose_dt1, 2)
+        orientation_dt1, _ = jnp.split(pose_dt1, 2)
         phi_dt1, theta_dt1, psi_dt1 = orientation_dt1
 
         # omega_1 = psi_dt1 * z_col_dt0
@@ -134,20 +137,21 @@ class CustomMobilizer(AbstractMobilizer):
         y_col_dt1 = skew_matrix(omega_1.flatten()) @ y_col_dt0
         z_col_dt1 = skew_matrix(omega_2.flatten()) @ z_col_dt0
 
-        W_FM_dt1 = np.column_stack([x_col_dt1, y_col_dt1, z_col_dt1])
+        W_FM_dt1 = jnp.column_stack([x_col_dt1, y_col_dt1, z_col_dt1])
 
         return W_FM_dt1
 
+    @partial(jax.jit, static_argnums=(0,))
     def v_J(self, qdt0: np.ndarray, qdt1: np.ndarray) -> np.ndarray:
-
         pose_jacobian_dt0 = self.polynomials.pose_jacobian_dt0(qdt0)
         pose_dt1 = pose_jacobian_dt0 @ qdt1
-        orientation_dt1, location_dt1 = np.split(pose_dt1, 2)
+        orientation_dt1, location_dt1 = jnp.split(pose_dt1, 2)
 
         angular_vel = self.W_FM_dt0(qdt0) @ orientation_dt1
 
-        return np.hstack([angular_vel, location_dt1])
+        return jnp.hstack([angular_vel, location_dt1])
 
+    @partial(jax.jit, static_argnums=(0,))
     def a_J(self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray) -> np.ndarray:
         pose_jacobian_dt0 = self.polynomials.pose_jacobian_dt0(qdt0)
         pose_jacobian_dt1 = self.polynomials.pose_jacobian_dt1(qdt0, qdt1)
@@ -155,31 +159,31 @@ class CustomMobilizer(AbstractMobilizer):
         pose_dt1 = pose_jacobian_dt0 @ qdt1
         pose_dt2 = (pose_jacobian_dt0 @ qdt2) + (pose_jacobian_dt1 @ qdt1)
 
-        orientation_dt1, location_dt1 = np.split(pose_dt1, 2)
-        orientation_dt2, location_dt2 = np.split(pose_dt2, 2)
+        orientation_dt1, location_dt1 = jnp.split(pose_dt1, 2)
+        orientation_dt2, location_dt2 = jnp.split(pose_dt2, 2)
 
         W_FM_dt0 = self.W_FM_dt0(qdt0)
         W_FM_dt1 = self.W_FM_dt1(W_FM_dt0, pose_dt1)
 
         angular_acc = (W_FM_dt0 @ orientation_dt2) + (W_FM_dt1 @ orientation_dt1)
 
-        return np.hstack([angular_acc, location_dt2])
+        return jnp.hstack([angular_acc, location_dt2])
 
+    @partial(jax.jit, static_argnums=(0,))
     def S_FM(self, qdt0: np.ndarray) -> np.ndarray:
-
         W_FM_dt0 = self.W_FM_dt0(qdt0)
         A_FM_dt0 = np.eye(3)
         pose_jacobian_dt0 = self.polynomials.pose_jacobian_dt0(qdt0)
 
-        S_FM = np.vstack(
+        S_FM = jnp.vstack(
             [W_FM_dt0 @ pose_jacobian_dt0[:3], A_FM_dt0 @ pose_jacobian_dt0[3:]]
         )
         return S_FM
 
+    @partial(jax.jit, static_argnums=(0,))
     def evaluate_kinematics(
         self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
     ) -> MobilizerKinematics:
-
         pose_jacobian_dt0 = self.polynomials.pose_jacobian_dt0(qdt0)
         pose_jacobian_dt1 = self.polynomials.pose_jacobian_dt1(qdt0, qdt1)
 
@@ -195,42 +199,46 @@ class CustomMobilizer(AbstractMobilizer):
         phi, theta, psi = orientation_dt0
         R_FM = rot_z(psi) @ rot_y(theta) @ rot_x(phi)
         X_FM = spatial_motion_transformation(R_FM, -R_FM.T @ location_dt0)
-        S_FM = np.vstack([W_FM_dt0 @ pose_jacobian_dt0[:3], pose_jacobian_dt0[3:]])
+        S_FM = jnp.vstack([W_FM_dt0 @ pose_jacobian_dt0[:3], pose_jacobian_dt0[3:]])
 
         # velocity-level evaluations
         orientation_dt1, location_dt1 = pose_dt1.reshape(2, -1)
         angular_vel = W_FM_dt0 @ orientation_dt1
-        spatial_vel = np.hstack([angular_vel, location_dt1])
+        spatial_vel = jnp.hstack([angular_vel, location_dt1])
 
         # acceleration-level evaluations
         orientation_dt2, location_dt2 = pose_dt2.reshape(2, -1)
         angular_acc = (W_FM_dt1 @ orientation_dt1) + (W_FM_dt0 @ orientation_dt2)
-        spatial_acc = np.hstack([angular_acc, location_dt2])
+        spatial_acc = jnp.hstack([angular_acc, location_dt2])
 
         kinematics = MobilizerKinematics(X_FM, S_FM, spatial_vel, spatial_acc)
         return kinematics
 
 
 class RevoluteMobilizer(CustomMobilizer):
-
     nj = 1
     polynomials: MotionEquations = RevolutePolynomials
 
+    @partial(jax.jit, static_argnums=(0,))
     def X_FM(self, qdt0: np.ndarray) -> np.ndarray:
         psi_dt0 = qdt0[0]
         return spatial_motion_rotation(rot_z(psi_dt0))
 
+    @partial(jax.jit, static_argnums=(0,))
     def S_FM(self, qdt0: np.ndarray) -> np.ndarray:
         return np.array([0, 0, 1, 0, 0, 0])[:, None]
 
+    @partial(jax.jit, static_argnums=(0,))
     def v_J(self, qdt0: np.ndarray, qdt1: np.ndarray) -> np.ndarray:
         psi_dt1 = qdt1[0]
-        return np.array([0, 0, psi_dt1, 0, 0, 0])
+        return jnp.array([0, 0, psi_dt1, 0, 0, 0])
 
+    @partial(jax.jit, static_argnums=(0,))
     def a_J(self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray) -> np.ndarray:
         psi_dt2 = qdt2[0]
-        return np.array([0, 0, psi_dt2, 0, 0, 0])
+        return jnp.array([0, 0, psi_dt2, 0, 0, 0])
 
+    @partial(jax.jit, static_argnums=(0,))
     def evaluate_kinematics(
         self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
     ) -> MobilizerKinematics:
@@ -242,25 +250,29 @@ class RevoluteMobilizer(CustomMobilizer):
 
 
 class TranslationalMobilizer(CustomMobilizer):
-
     nj = 1
     polynomials: MotionEquations = TranslationalPolynomials
 
+    @partial(jax.jit, static_argnums=(0,))
     def X_FM(self, qdt0: np.ndarray) -> np.ndarray:
         z_dt0 = qdt0[0]
         return spatial_motion_translation(np.array([0, 0, -z_dt0]))
 
+    @partial(jax.jit, static_argnums=(0,))
     def S_FM(self, qdt0: np.ndarray) -> np.ndarray:
         return np.array([0, 0, 0, 0, 0, 1])[:, None]
 
+    @partial(jax.jit, static_argnums=(0,))
     def v_J(self, qdt0: np.ndarray, qdt1: np.ndarray) -> np.ndarray:
         z_dt1 = qdt1[0]
-        return np.array([0, 0, 0, 0, 0, z_dt1])
+        return jnp.array([0, 0, 0, 0, 0, z_dt1])
 
+    @partial(jax.jit, static_argnums=(0,))
     def a_J(self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray) -> np.ndarray:
         z_dt2 = qdt2[0]
-        return np.array([0, 0, 0, 0, 0, z_dt2])
+        return jnp.array([0, 0, 0, 0, 0, z_dt2])
 
+    @partial(jax.jit, static_argnums=(0,))
     def evaluate_kinematics(
         self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
     ) -> MobilizerKinematics:
@@ -272,12 +284,10 @@ class TranslationalMobilizer(CustomMobilizer):
 
 
 class PlanarMobilizer(CustomMobilizer):
-
     nj = 3
     polynomials: MotionEquations = PlanarPolynomials
 
 
 class FreeMobilizer(CustomMobilizer):
-
     nj = 6
     polynomials: MotionEquations = FreePolynomials

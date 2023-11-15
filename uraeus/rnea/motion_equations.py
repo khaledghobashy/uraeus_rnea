@@ -1,9 +1,8 @@
 from typing import NamedTuple, Callable, Tuple
 
-# import jax
+import jax
+import jax.numpy as jnp
 import numpy as np
-
-# import numpy as np
 
 
 def construct_motion_jacobians(
@@ -35,7 +34,6 @@ def construct_motion_jacobians(
 
 
 class MotionEquations(NamedTuple):
-
     nj: int
     pose_polynomials: Callable[[np.ndarray], np.ndarray]
     pose_jacobian_dt0: Callable[[np.ndarray], np.ndarray]
@@ -43,7 +41,6 @@ class MotionEquations(NamedTuple):
 
 
 class MotionEquationsMeta(type):
-
     _required_fields = {
         "nj",
         "pose_polynomials",
@@ -52,7 +49,6 @@ class MotionEquationsMeta(type):
     }
 
     def __new__(cls, class_name, bases, attrs):
-
         if class_name == "AbstractMotionEquations":
             return type.__new__(cls, class_name, bases, attrs)
 
@@ -66,7 +62,6 @@ class MotionEquationsMeta(type):
 
 
 class AbstractMotionEquations(object, metaclass=MotionEquationsMeta):
-
     nj: int
 
     @staticmethod
@@ -83,13 +78,12 @@ class AbstractMotionEquations(object, metaclass=MotionEquationsMeta):
 
 
 class RevolutePolynomials(AbstractMotionEquations):
-
     nj = 1
 
     @staticmethod
     def pose_polynomials(qd0: np.ndarray):
         psi = qd0[0]
-        pose_states = np.array([0, 0, psi, 0, 0, 0])
+        pose_states = jnp.array([0, 0, psi, 0, 0, 0])
         return pose_states
 
     @staticmethod
@@ -104,13 +98,12 @@ class RevolutePolynomials(AbstractMotionEquations):
 
 
 class TranslationalPolynomials(AbstractMotionEquations):
-
     nj = 1
 
     @staticmethod
     def pose_polynomials(qd0: np.ndarray):
         z = qd0[0]
-        pose_states = np.array([0, 0, 0, 0, 0, z])
+        pose_states = jnp.array([0, 0, 0, 0, 0, z])
         return pose_states
 
     @staticmethod
@@ -125,13 +118,12 @@ class TranslationalPolynomials(AbstractMotionEquations):
 
 
 class PlanarPolynomials(AbstractMotionEquations):
-
     nj = 3
 
     @staticmethod
     def pose_polynomials(qdt0: np.ndarray):
         psi, x, y = qdt0
-        pose_states = np.array([0, 0, psi, x, y, 0])
+        pose_states = jnp.array([0, 0, psi, x, y, 0])
         return pose_states
 
     @staticmethod
@@ -155,13 +147,12 @@ class PlanarPolynomials(AbstractMotionEquations):
 
 
 class FreePolynomials(AbstractMotionEquations):
-
     nj = 6
 
     @staticmethod
     def pose_polynomials(qdt0: np.ndarray):
         phi, theta, psi, x, y, z = qdt0
-        pose_states = np.array([phi, theta, psi, x, y, z])
+        pose_states = jnp.array([phi, theta, psi, x, y, z])
         return pose_states
 
     @staticmethod

@@ -3,9 +3,11 @@ from itertools import repeat
 from operator import sub
 from typing import Iterable, List, Dict, NamedTuple, Tuple
 
+import jax
+import jax.numpy as jnp
 import numpy as np
-from uraeus.rnea.bodies import BodyKinematics
 
+from uraeus.rnea.bodies import BodyKinematics
 from uraeus.rnea.joints import (
     JointKinematics,
 )
@@ -19,23 +21,24 @@ from uraeus.rnea.topologies import HybridDynamicsData, MultiBodyData
 from uraeus.rnea.graphs import accumulate_root_to_leaf
 from uraeus.rnea.tree_traversals import (
     base_to_tip,
+    tip_to_base,
     evaluate_tau,
     joints_forces_accumulator,
-    tip_to_base,
 )
 
 
-def split(arr: np.ndarray, idx: np.ndarray):
-    res = [arr[i:j] for (i, j) in zip(idx[:-1], idx[1:])]
-    return res
+# def split(arr: np.ndarray, idx: np.ndarray):
+#     res = [arr[i:j] for (i, j) in zip(idx[:-1], idx[1:])]
+#     return res
 
 
+@partial(jax.jit, static_argnums=(0,))
 def split_coordinates(
-    idx: np.ndarray, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
+    idx: Tuple[int], qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
 ) -> Iterable[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
-    coordinates = [
+    coordinates = tuple(
         (qdt0[i:j], qdt1[i:j], qdt2[i:j]) for (i, j) in zip(idx[:-1], idx[1:])
-    ]
+    )
     return coordinates
 
 
@@ -46,6 +49,7 @@ class IDCallRes(NamedTuple):
     joints_forces: List[np.ndarray]
 
 
+@partial(jax.jit, static_argnums=(0,))
 def inverse_dynamics_call(
     tree_data: MultiBodyData,
     external_forces: List[List[np.ndarray]],
@@ -53,14 +57,13 @@ def inverse_dynamics_call(
     qdt1: np.ndarray,
     qdt2: np.ndarray,
 ) -> IDCallRes:
-
     func_joints = tree_data.joints
     forward_traversal = tree_data.forward_traversal
     backward_traversal = tree_data.backward_traversal
     qdt0_idx = tree_data.qdt0_idx
 
     joints_coordinates = split_coordinates(qdt0_idx, qdt0, qdt1, qdt2)
-    joints_frames = [j.frames for j in tree_data.joints]
+    joints_frames = tuple(j.frames for j in tree_data.joints)
 
     bodies_kin, joints_kin = base_to_tip(
         joints=func_joints,
@@ -80,18 +83,19 @@ def inverse_dynamics_call(
     return IDCallRes(tau, bodies_kin, joints_kin, joints_forces)
 
 
+@partial(jax.jit, static_argnums=(0,))
 def evaluate_C(
     tree_data: MultiBodyData,
     external_forces: List[List[np.ndarray]],
     qdt0: np.ndarray,
     qdt1: np.ndarray,
 ) -> IDCallRes:
-
-    qdt2 = np.zeros_like(qdt1)
+    qdt2 = jnp.zeros_like(qdt1)
     res = inverse_dynamics_call(tree_data, external_forces, qdt0, qdt1, qdt2)
     return res
 
 
+@partial(jax.jit, static_argnums=(0,))
 def forward_dynamics_call(
     tree_data: MultiBodyData,
     external_forces: List[List[np.ndarray]],
@@ -99,15 +103,15 @@ def forward_dynamics_call(
     qdt1: np.ndarray,
     tau: np.ndarray,
 ) -> np.ndarray:
-
     C, _, joints_kin, _ = evaluate_C(tree_data, external_forces, qdt0, qdt1)
     H = JointInertiaMatrixOperations.construct_H(tree_data, joints_kin, qdt0)
 
     rhs = tau - C
-    qdt2 = np.linalg.solve(H, rhs)
+    qdt2 = jnp.linalg.solve(H, rhs)
     return qdt2
 
 
+@jax.jit
 def eval_successor_acc(
     predecessor_acc: np.ndarray, joint_kin: JointKinematics
 ) -> np.ndarray:
@@ -123,11 +127,12 @@ node_acceleration_accumulator = accumulate_root_to_leaf(
 
 class JointInertiaMatrixOperations(NamedTuple):
     @classmethod
+    @partial(jax.jit, static_argnums=(0, 1))
     def construct_H(
         cls,
         tree_data: MultiBodyData,
         joints_kin: List[JointKinematics],
-        qdt0,
+        qdt0: np.ndarray,
     ):
         booleans = np.eye(len(qdt0))
         new_kins = [
@@ -135,9 +140,10 @@ class JointInertiaMatrixOperations(NamedTuple):
             for delta in booleans
         ]
         H_columns = [cls.traverse(tree_data, j_kin) for j_kin in new_kins]
-        return np.column_stack(H_columns)
+        return jnp.column_stack(H_columns)
 
     @staticmethod
+    @partial(jax.jit, static_argnums=(0,))
     def construct_new_acc(
         tree_data: MultiBodyData,
         joints_kin: List[JointKinematics],
@@ -145,7 +151,7 @@ class JointInertiaMatrixOperations(NamedTuple):
         qdt2: np.ndarray,
     ) -> List[np.ndarray]:
         coordinates = split_coordinates(
-            tree_data.qdt0_idx, qdt0, np.zeros_like(qdt0), qdt2
+            tree_data.qdt0_idx, qdt0, jnp.zeros_like(qdt0), qdt2
         )
         a_J_mob = [j.mobilizer.a_J(*qs) for j, qs in zip(tree_data.joints, coordinates)]
         a_J_jnt = [j.frames.X_SM @ a_J for j, a_J in zip(tree_data.joints, a_J_mob)]
@@ -155,23 +161,24 @@ class JointInertiaMatrixOperations(NamedTuple):
         return new_kin
 
     @staticmethod
+    @partial(jax.jit, static_argnums=(0,))
     def traverse(
         tree_data: MultiBodyData,
         joints_kin: List[JointKinematics],
     ):
         forward_traversal = tree_data.forward_traversal
         backward_traversal = tree_data.backward_traversal
-        joints_frames = [j.frames for j in tree_data.joints]
-        forces_transforms = [
+        joints_frames = tuple(j.frames for j in tree_data.joints)
+        forces_transforms = tuple(
             motion_to_force_transform(j.X_PS) for j in reversed(joints_kin)
-        ]
+        )
 
-        bodies_acc = node_acceleration_accumulator(joints_kin, forward_traversal)
-        bodies_forces = list(map(np.dot, tree_data.bodies_inertias, bodies_acc))
+        bodies_acc = node_acceleration_accumulator(forward_traversal, joints_kin)
+        bodies_forces = tuple(map(jnp.dot, tree_data.bodies_inertias, bodies_acc))
         forces = joints_forces_accumulator(
             bodies_forces, forces_transforms, backward_traversal
         )
-        forces = reversed(forces)
+        forces = tuple(reversed(forces))
 
         tau = evaluate_tau(joints_frames, joints_kin, forces)
         return tau
@@ -186,7 +193,6 @@ class HybridDynamics(object):
         qdt1: np.ndarray,
         qdt2_id: np.ndarray,
     ) -> IDCallRes:
-
         n_fd = hybrid_data.n_fd
         Q = hybrid_data.permutation_matrix
         qdt2 = Q.T @ np.hstack([np.zeros((n_fd,)), qdt2_id])
@@ -204,7 +210,6 @@ class HybridDynamics(object):
         qdt2_id: np.ndarray,
         tau_fd: np.ndarray,
     ) -> np.ndarray:
-
         n_fd = hybrid_data.n_fd
         Q = hybrid_data.permutation_matrix
 
@@ -234,15 +239,16 @@ def _helper(predecessor_X_GB, joint):
 _bodies_config_func = accumulate_root_to_leaf(np.eye(6), _helper)
 
 
+@partial(jax.jit, static_argnums=(0,))
 def ext_forces_to_gen_forces(
     tree_data: MultiBodyData,
-    joints_kin: List[JointKinematics],
-    ext_forces: List[List[np.ndarray]],
+    joints_kin: Tuple[JointKinematics, ...],
+    ext_forces: Tuple[Tuple[np.ndarray, ...], ...],
 ):
-    bodies_E_BG = _bodies_config_func(joints_kin, tree_data.forward_traversal)
+    bodies_E_BG = _bodies_config_func(tree_data.forward_traversal, joints_kin)
     bodies_E_BG_f = map(motion_to_force_transform, bodies_E_BG)
     bodies_fe_S = map(
-        np.dot, bodies_E_BG_f, [sum(forces, np.zeros((6,))) for forces in ext_forces]
+        jnp.dot, bodies_E_BG_f, [sum(forces, np.zeros((6,))) for forces in ext_forces]
     )
     forces_transforms = [
         motion_to_force_transform(j.X_PS) for j in reversed(joints_kin)

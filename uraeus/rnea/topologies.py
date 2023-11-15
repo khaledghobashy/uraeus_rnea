@@ -17,14 +17,12 @@ import numpy as np
 
 
 class MultiBodyTree(object):
-
     name: str
     tree: Tree
     bodies: Dict[str, RigidBody]
     joints: Dict[str, JointInstance]
 
     def __init__(self, name: str):
-
         self.name = name
         self.tree = Tree(self.name, root="ground")
 
@@ -44,7 +42,6 @@ class MultiBodyTree(object):
         joint_type: AbstractJoint,
         joint_data: JointConfigInputs,
     ) -> None:
-
         if self.check_if_joint_exists(joint_name):
             raise ValueError(f"Joint '{joint_name}' already exists!")
 
@@ -78,7 +75,6 @@ class MultiBodyTree(object):
         return self.bodies[name]
 
     def construct_bodies_coordinates_names(self) -> List[str]:
-
         coordinates = ["phi", "theta", "psi", "x", "y", "z"]
         namer = lambda l, name: l + [f"{name}.{c}" for c in coordinates]
         bodies_coordinates = reduce(namer, self.bodies.keys(), [])
@@ -89,13 +85,15 @@ class MultiBodyTree(object):
 
 
 class MultiBodyData(NamedTuple):
-
-    joints: List[FunctionalJoint]
+    joints: Tuple[FunctionalJoint]
     bodies_inertias: List[np.ndarray]
-    forward_traversal: List[Tuple[int, int, int]]
+    forward_traversal: Tuple[Tuple[int, int, int], ...]
     backward_traversal: List[Tuple[int, List[int]]]
-    qdt0_idx: np.ndarray
-    qdt1_idx: np.ndarray
+    qdt0_idx: Tuple[int]
+    qdt1_idx: Tuple[int]
+
+    def __hash__(self):
+        return hash(self.__class__.__name__)
 
 
 class HybridDynamicsData(NamedTuple):
@@ -129,8 +127,7 @@ def construct_hybriddynamics_data(
 
 
 def construct_multibodydata(topology: MultiBodyTree) -> MultiBodyData:
-
-    func_joints = list(map(construct_functional_joint, topology.joints.values()))
+    func_joints = tuple(map(construct_functional_joint, topology.joints.values()))
     bodies_inertias = [b.I for b in topology.bodies.values()]
     forward_traversal, backward_traversal = contstruct_traversal_orders(topology.tree)
     qdt0_idx = [0] + list(np.cumsum([j.nj for j in func_joints]))
@@ -141,8 +138,8 @@ def construct_multibodydata(topology: MultiBodyTree) -> MultiBodyData:
         bodies_inertias=bodies_inertias,
         forward_traversal=forward_traversal,
         backward_traversal=backward_traversal,
-        qdt0_idx=qdt0_idx,
-        qdt1_idx=qdt1_idx,
+        qdt0_idx=tuple(qdt0_idx),
+        qdt1_idx=tuple(qdt1_idx),
     )
 
     return data
