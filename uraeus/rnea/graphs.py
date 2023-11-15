@@ -1,18 +1,18 @@
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple
 from collections import defaultdict
-from functools import reduce
+from functools import reduce, partial
 
+import jax
+import jax.numpy as jnp
 import numpy as np
 
 
 class Graph(object):
-
     adj_list: Dict[str, List[str]]
     nodes: List[str]
     edges: List[Tuple[str, str]]
 
     def __init__(self, name: str):
-
         self.name = name
         self.adj_list = defaultdict(list)
         self.edges = []
@@ -28,13 +28,11 @@ class Graph(object):
 
 
 class Tree(object):
-
     adj_list: Dict[str, List[str]]
     nodes: List[str]
     edges: List[Tuple[str, str]]
 
     def __init__(self, name: str, root: Optional[str] = "root"):
-
         self.graph = Graph(name)
         self.root = root
         self.graph.adj_list[self.root] = []
@@ -64,11 +62,31 @@ class Tree(object):
         return node in self.adj_list
 
 
+# def accumulate_root_to_leaf(
+#     root_initial: Any,
+#     cumfunc: Callable[[Any, Any], Any],
+# ) -> Callable[[List[Any], List[Tuple[int, int, int]]], List[Any]]:
+#     def func(edges_wieghts: List[Any], traversal_order: List[Tuple[int, int, int]]):
+#         nodes_vals = [root_initial]
+
+#         for _, edge_index, predecessor_index in traversal_order:
+#             successor_val = cumfunc(
+#                 nodes_vals[predecessor_index], edges_wieghts[edge_index]
+#             )
+#             nodes_vals.append(successor_val)
+#         return nodes_vals
+
+#     return func
+
+
 def accumulate_root_to_leaf(
     root_initial: Any,
     cumfunc: Callable[[Any, Any], Any],
 ) -> Callable[[List[Any], List[Tuple[int, int, int]]], List[Any]]:
-    def func(edges_wieghts: List[Any], traversal_order: List[Tuple[int, int, int]]):
+    # @partial(jax.jit, static_argnums=(0,))
+    def func(
+        traversal_order: Tuple[Tuple[int, int, int], ...], edges_wieghts: Tuple[Any]
+    ):
         nodes_vals = [root_initial]
 
         for _, edge_index, predecessor_index in traversal_order:
@@ -78,7 +96,7 @@ def accumulate_root_to_leaf(
             nodes_vals.append(successor_val)
         return nodes_vals
 
-    return func
+    return partial(jax.jit(func, static_argnums=(0,)))
 
 
 def accumulate_leaf_to_root(
@@ -100,7 +118,7 @@ def accumulate_leaf_to_root(
 
         return edges_cumvals
 
-    return func
+    return partial(jax.jit(func, static_argnums=(2,)))
 
 
 def contstruct_traversal_orders(tree: Tree):
@@ -110,7 +128,7 @@ def contstruct_traversal_orders(tree: Tree):
     ]
     edges_indices = {e: i for i, e in enumerate(reversed(tree.edges))}
     tip_to_base = [
-        (nodes_indicies[node], [edges_indices[(node, c)] for c in childern])
+        (nodes_indicies[node], tuple(edges_indices[(node, c)] for c in childern))
         for node, childern in reversed(tree.adj_list.items())
     ]
-    return base_to_tip, tip_to_base
+    return tuple(base_to_tip), tuple(tip_to_base)

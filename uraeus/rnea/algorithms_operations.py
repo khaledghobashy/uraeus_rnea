@@ -1,6 +1,7 @@
 from typing import List, Tuple
 
-# import jax
+import jax
+import jax.numpy as jnp
 import numpy as np
 
 from uraeus.rnea.spatial_algebra import (
@@ -20,11 +21,11 @@ from uraeus.rnea.joints import (
 from uraeus.rnea.mobilizers import MobilizerForces
 
 
+@jax.jit
 def evaluate_successor_kinematics(
     predecessor_kin: BodyKinematics,
     joint_kin: JointKinematics,
 ) -> BodyKinematics:
-
     X_GB = predecessor_kin.X_GB @ joint_kin.X_PS
     X_BG = spatial_transform_transpose(X_GB)
 
@@ -46,6 +47,7 @@ def evaluate_successor_kinematics(
     return successor_kin
 
 
+@jax.jit
 def evaluate_joint_inertia_force(
     successor_kin: BodyKinematics,
     successor_I: np.ndarray,
@@ -62,6 +64,7 @@ def evaluate_joint_inertia_force(
     return fb_S - fe_S
 
 
+@jax.jit
 def construct_mobilizer_force(
     fi_S: np.ndarray,
     joint_frames: JointFrames,
@@ -78,6 +81,7 @@ def construct_mobilizer_force(
     return MobilizerForces(fi_S, fc_S, fa_S, fc_G, tau)
 
 
+@jax.jit
 def extract_force_components(
     fi_S: np.ndarray, joint_frames: JointFrames, joint_kin: JointKinematics
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -97,10 +101,11 @@ def extract_force_components(
     return fc_S, fa_S, tau
 
 
+@jax.jit
 def translational_spatial_vector(v: np.ndarray) -> np.ndarray:
     rotational_part = np.zeros((3,))
     _, translational_part = v.reshape(2, -1)
-    return np.hstack([rotational_part, translational_part])
+    return jnp.hstack([rotational_part, translational_part])
 
 
 # =============================================================================

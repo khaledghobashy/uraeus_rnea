@@ -1,6 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, NamedTuple, Set, Tuple, Type
+from functools import partial
 
+import jax
+import jax.numpy as jnp
 import numpy as np
 
 from uraeus.rnea.motion_equations import MotionEquations, construct_motion_jacobians
@@ -24,13 +27,11 @@ from uraeus.rnea.bodies import RigidBody
 
 
 class JointFrames(NamedTuple):
-
     X_SM: np.ndarray
     X_PF: np.ndarray
 
 
 class JointKinematics(NamedTuple):
-
     X_FM: np.ndarray
     X_SP: np.ndarray
     X_PS: np.ndarray
@@ -40,13 +41,11 @@ class JointKinematics(NamedTuple):
 
 
 class JointVariables(NamedTuple):
-
     kinematics: JointKinematics
     forces: MobilizerForces
 
 
 class StatesNames(NamedTuple):
-
     pos_states: List[str]
     vel_states: List[str]
     acc_states: List[str]
@@ -59,7 +58,6 @@ class JointConfigInputs(NamedTuple):
 
 
 class JointData(NamedTuple):
-
     name: str
     predecessor: RigidBody
     successor: RigidBody
@@ -76,7 +74,6 @@ def construct_state_names(name: str, coordinates_names: List[str]) -> StatesName
 
 
 class AbstractJoint(NamedTuple):
-
     nj: int
     mobilizer: AbstractMobilizer
     coordinates_names: List[str]
@@ -86,6 +83,7 @@ class JointInstance(NamedTuple):
     joint_data: JointData
     joint_type: AbstractJoint
 
+    @partial(jax.jit, static_argnums=(0,))
     def evaluate_kinematics(
         self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
     ) -> MobilizerKinematics:
@@ -127,17 +125,20 @@ FreeJoint = AbstractJoint(
 
 
 class FunctionalJoint(NamedTuple):
-
     nj: int
     mobilizer: AbstractMobilizer
     frames: JointFrames
 
+    # @partial(jax.jit, static_argnums=(0,))
     def evaluate_kinematics(
         self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
     ) -> JointKinematics:
         mobilizer_kinematics = self.mobilizer.evaluate_kinematics(qdt0, qdt1, qdt2)
         joint_kinematics = evaluate_joint_kinematics(mobilizer_kinematics, self.frames)
         return joint_kinematics
+
+    def __hash__(self):
+        return hash(self.__class__.__name__)
 
 
 def construct_functional_joint(joint: JointInstance) -> FunctionalJoint:
@@ -156,18 +157,17 @@ def construct_joint_instance(
     successor: RigidBody,
     joint_frames: JointFrames,
 ) -> JointInstance:
-
     state_names = construct_state_names(name, joint_type.coordinates_names)
     joint_data = JointData(name, predecessor, successor, joint_frames, state_names)
     joint_instance = JointInstance(joint_data, joint_type)
     return joint_instance
 
 
+@jax.jit
 def evaluate_joint_kinematics(
     mobilizer_kinematics: MobilizerKinematics,
     joint_frames: JointFrames,
 ) -> JointKinematics:
-
     X_SM = joint_frames.X_SM
     X_PF = joint_frames.X_PF
 
@@ -191,7 +191,6 @@ def construct_custom_joint(
     nj: int,
     coordinates_names: List[str],
 ) -> Type[AbstractJoint]:
-
     pose_jacobian_dt0, pose_jacobian_dt1 = construct_motion_jacobians(pose_polynomials)
     polynomials = MotionEquations(
         nj, pose_polynomials, pose_jacobian_dt0, pose_jacobian_dt1
@@ -217,7 +216,6 @@ def initialize_joint(
     P_X_BG: np.ndarray,
     S_X_BG: np.ndarray,
 ) -> JointFrames:
-
     R_GJ = triad(z_axis, x_axis)
 
     X_GJ = spatial_motion_transformation(R_GJ, R_GJ.T @ -location)
@@ -229,7 +227,6 @@ def initialize_joint(
 
 
 def orthogonal_vector(v: np.ndarray):
-
     x, y, z = v
 
     v1 = np.array([y, -x, 0])
@@ -243,7 +240,6 @@ def orthogonal_vector(v: np.ndarray):
 
 
 def triad(v1: np.ndarray, v2: np.ndarray) -> np.ndarray:
-
     k = v1 / np.linalg.norm(v1)
     if v2 is not None:
         i = v2 / np.linalg.norm(v2)
