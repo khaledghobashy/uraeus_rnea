@@ -62,23 +62,6 @@ class Tree(object):
         return node in self.adj_list
 
 
-# def accumulate_root_to_leaf(
-#     root_initial: Any,
-#     cumfunc: Callable[[Any, Any], Any],
-# ) -> Callable[[List[Any], List[Tuple[int, int, int]]], List[Any]]:
-#     def func(edges_wieghts: List[Any], traversal_order: List[Tuple[int, int, int]]):
-#         nodes_vals = [root_initial]
-
-#         for _, edge_index, predecessor_index in traversal_order:
-#             successor_val = cumfunc(
-#                 nodes_vals[predecessor_index], edges_wieghts[edge_index]
-#             )
-#             nodes_vals.append(successor_val)
-#         return nodes_vals
-
-#     return func
-
-
 def accumulate_root_to_leaf(
     root_initial: Any,
     cumfunc: Callable[[Any, Any], Any],
@@ -132,3 +115,16 @@ def contstruct_traversal_orders(tree: Tree):
         for node, childern in reversed(tree.adj_list.items())
     ]
     return tuple(base_to_tip), tuple(tip_to_base)
+
+
+def adj2int(graph: Graph):
+    d = dict(zip(graph.nodes, range(len(graph.nodes))))
+    edges = tuple((d[p], d[s]) for p, s in graph.edges)
+    return edges
+
+
+def edges_coordinates(
+    qdt0s: tuple[np.ndarray],
+    edges: tuple[tuple[int, int]],
+) -> tuple[tuple[np.ndarray, np.ndarray]]:
+    return tuple((qdt0s[p], qdt0s[s]) for p, s in edges)

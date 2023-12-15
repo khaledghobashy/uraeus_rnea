@@ -2,7 +2,7 @@ from functools import reduce
 from typing import Dict, List, NamedTuple, Tuple
 
 from uraeus.rnea.bodies import RigidBody, RigidBodyData
-from uraeus.rnea.graphs import Tree, contstruct_traversal_orders
+from uraeus.rnea.graphs import Graph, Tree, contstruct_traversal_orders
 from uraeus.rnea.joints import (
     AbstractJoint,
     FunctionalJoint,
@@ -14,6 +14,51 @@ from uraeus.rnea.joints import (
 )
 
 import numpy as np
+
+
+class MultiBodyGraph(object):
+    name: str
+    graph: Graph
+    bodies: Dict[str, RigidBody]
+    joints: Dict[str, JointInstance]
+
+    def __init__(self, name: str):
+        self.name = name
+        self.graph = Graph(self.name)
+
+        self.bodies = {}
+        self.joints = {}
+
+    @property
+    def nc(self):
+        return sum(j[0].nc for j in self.joints.values())
+
+    @property
+    def dof(self):
+        return (6 * (len(self.bodies) - 1)) - self.nc
+
+    def add_body(self, body_name: str, body_data):
+        assert body_name not in self.bodies
+        self.bodies[body_name] = body_data
+
+    def add_joint(
+        self,
+        joint_name: str,
+        body_i: RigidBodyData,
+        body_j: RigidBodyData,
+        joint_type,
+        joint_config,
+    ):
+        assert body_i in self.bodies
+        assert body_j in self.bodies
+        assert joint_name not in self.joints
+        self.graph.add_edge(body_i, body_j)
+        self.joints[joint_name] = (
+            joint_type,
+            joint_config,
+            self.bodies[body_i],
+            self.bodies[body_j],
+        )
 
 
 class MultiBodyTree(object):

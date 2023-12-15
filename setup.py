@@ -27,6 +27,9 @@ setuptools.setup(
     install_requires=[
         "numpy",
         "jax",
+        "jaxlib",
         "matplotlib",
+        "networkx",
+        "pydantic",
     ],
 )
