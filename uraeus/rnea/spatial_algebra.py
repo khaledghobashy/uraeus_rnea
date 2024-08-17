@@ -4,10 +4,8 @@ import jax
 import numpy as np
 import jax.numpy as jnp
 
-from jax.config import config
-
-config.update("jax_enable_x64", True)
-config.update("jax_traceback_filtering", "off")
+jax.config.update("jax_enable_x64", True)
+jax.config.update("jax_traceback_filtering", "off")
 
 
 @jax.jit

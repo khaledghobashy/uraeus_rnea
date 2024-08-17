@@ -82,7 +82,7 @@ def construct_bodies_data(vehicle_data: VehicleData) -> BodiesData:
     chassis_data = RigidBodyData(
         location=np.array(
             [
-                -(1 - chassis.weight_distribution_f) * chassis.wheelbase,
+                (chassis.weight_distribution_f) * chassis.wheelbase,
                 0,
                 chassis.cg_height,
             ]
@@ -95,7 +95,7 @@ def construct_bodies_data(vehicle_data: VehicleData) -> BodiesData:
     fr_carrier_data = RigidBodyData(
         location=np.array(
             [
-                0,
+                chassis.wheelbase,
                 -susp_front.trackwidth / 2,
                 wheels_front.wc_height,
             ]
@@ -108,7 +108,7 @@ def construct_bodies_data(vehicle_data: VehicleData) -> BodiesData:
     fl_carrier_data = RigidBodyData(
         location=np.array(
             [
-                0,
+                chassis.wheelbase,
                 susp_front.trackwidth / 2,
                 wheels_front.wc_height,
             ]
@@ -121,7 +121,7 @@ def construct_bodies_data(vehicle_data: VehicleData) -> BodiesData:
     rr_carrier_data = RigidBodyData(
         location=np.array(
             [
-                -chassis.wheelbase,
+                0,
                 -susp_rear.trackwidth / 2,
                 wheels_rear.wc_height,
             ]
@@ -134,7 +134,7 @@ def construct_bodies_data(vehicle_data: VehicleData) -> BodiesData:
     rl_carrier_data = RigidBodyData(
         location=np.array(
             [
-                -chassis.wheelbase,
+                0,
                 susp_rear.trackwidth / 2,
                 wheels_rear.wc_height,
             ]
@@ -147,7 +147,7 @@ def construct_bodies_data(vehicle_data: VehicleData) -> BodiesData:
     fr_wheel_data = RigidBodyData(
         location=np.array(
             [
-                0,
+                chassis.wheelbase,
                 -susp_front.trackwidth / 2,
                 wheels_front.wc_height,
             ]
@@ -160,7 +160,7 @@ def construct_bodies_data(vehicle_data: VehicleData) -> BodiesData:
     fl_wheel_data = RigidBodyData(
         location=np.array(
             [
-                0,
+                chassis.wheelbase,
                 susp_front.trackwidth / 2,
                 wheels_front.wc_height,
             ]
@@ -173,7 +173,7 @@ def construct_bodies_data(vehicle_data: VehicleData) -> BodiesData:
     rr_wheel_data = RigidBodyData(
         location=np.array(
             [
-                -chassis.wheelbase,
+                0,
                 -susp_rear.trackwidth / 2,
                 wheels_rear.wc_height,
             ]
@@ -186,7 +186,7 @@ def construct_bodies_data(vehicle_data: VehicleData) -> BodiesData:
     rl_wheel_data = RigidBodyData(
         location=np.array(
             [
-                -chassis.wheelbase,
+                0,
                 susp_rear.trackwidth / 2,
                 wheels_rear.wc_height,
             ]
@@ -221,7 +221,7 @@ def construct_joints_data(vehicle_data: VehicleData) -> JointsData:
     free_joint = JointConfigInputs(
         pos=np.array(
             [
-                -(1 - chassis.weight_distribution_f) * chassis.wheelbase,
+                (chassis.weight_distribution_f) * chassis.wheelbase,
                 0,
                 chassis.cg_height,
             ]
@@ -231,57 +231,57 @@ def construct_joints_data(vehicle_data: VehicleData) -> JointsData:
     )
 
     fr_susp = JointConfigInputs(
-        pos=np.array([0, -susp_front.trackwidth / 2, wheel_front.wc_height]),
+        pos=np.array(
+            [chassis.wheelbase, -susp_front.trackwidth / 2, wheel_front.wc_height]
+        ),
         z_axis=np.array([0, 0, 1]),
         x_axis=None,  # np.array([1, 0, 0]),
     )
 
     fr_wheel = JointConfigInputs(
-        pos=np.array([0, -susp_front.trackwidth / 2, wheel_front.wc_height]),
+        pos=np.array(
+            [chassis.wheelbase, -susp_front.trackwidth / 2, wheel_front.wc_height]
+        ),
         z_axis=np.array([0, 1, 0]),
         x_axis=None,  # np.array([0, 0, 1]),
     )
 
     fl_susp = JointConfigInputs(
-        pos=np.array([0, susp_front.trackwidth / 2, wheel_front.wc_height]),
+        pos=np.array(
+            [chassis.wheelbase, susp_front.trackwidth / 2, wheel_front.wc_height]
+        ),
         z_axis=np.array([0, 0, 1]),
         x_axis=None,  # np.array([1, 0, 0]),
     )
 
     fl_wheel = JointConfigInputs(
-        pos=np.array([0, susp_front.trackwidth / 2, wheel_front.wc_height]),
+        pos=np.array(
+            [chassis.wheelbase, susp_front.trackwidth / 2, wheel_front.wc_height]
+        ),
         z_axis=np.array([0, 1, 0]),
         x_axis=None,  # np.array([0, 0, 1]),
     )
 
     rr_susp = JointConfigInputs(
-        pos=np.array(
-            [-chassis.wheelbase, -susp_rear.trackwidth / 2, wheel_rear.wc_height]
-        ),
+        pos=np.array([0, -susp_rear.trackwidth / 2, wheel_rear.wc_height]),
         z_axis=np.array([0, 0, 1]),
         x_axis=None,  # np.array([1, 0, 0]),
     )
 
     rr_wheel = JointConfigInputs(
-        pos=np.array(
-            [-chassis.wheelbase, -susp_rear.trackwidth / 2, wheel_rear.wc_height]
-        ),
+        pos=np.array([0, -susp_rear.trackwidth / 2, wheel_rear.wc_height]),
         z_axis=np.array([0, 1, 0]),
         x_axis=None,  # np.array([0, 0, 1]),
     )
 
     rl_susp = JointConfigInputs(
-        pos=np.array(
-            [-chassis.wheelbase, susp_rear.trackwidth / 2, wheel_rear.wc_height]
-        ),
+        pos=np.array([0, susp_rear.trackwidth / 2, wheel_rear.wc_height]),
         z_axis=np.array([0, 0, 1]),
         x_axis=None,  # np.array([1, 0, 0]),
     )
 
     rl_wheel = JointConfigInputs(
-        pos=np.array(
-            [-chassis.wheelbase, susp_rear.trackwidth / 2, wheel_rear.wc_height]
-        ),
+        pos=np.array([0, susp_rear.trackwidth / 2, wheel_rear.wc_height]),
         z_axis=np.array([0, 1, 0]),
         x_axis=None,  # np.array([0, 0, 1]),
     )
