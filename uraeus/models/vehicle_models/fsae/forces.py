@@ -26,10 +26,12 @@ def esitmate_stiffness_damping(mass: float, frequency: float, damping_ratio: flo
 class Forces(NamedTuple):
     aero_force = AeroForce("aero", 0.3, 0.5, 1, np.array([0, 0, 0]))
 
-    fr_tire = TireMF52("fr_tire", "uraeus/rnea/utils/sample.tir")
-    fl_tire = TireMF52("fl_tire", "uraeus/rnea/utils/sample.tir")
-    rr_tire = TireMF52("rr_tire", "uraeus/rnea/utils/sample.tir")
-    rl_tire = TireMF52("rl_tire", "uraeus/rnea/utils/sample.tir")
+    tir_file = "/workspaces/uraeus_rnea/uraeus/models/vehicle_models/utils/sample.tir"
+
+    fr_tire = TireMF52("fr_tire", tir_file)
+    fl_tire = TireMF52("fl_tire", tir_file)
+    rr_tire = TireMF52("rr_tire", tir_file)
+    rl_tire = TireMF52("rl_tire", tir_file)
 
     motor = SimpleElectricMotor(
         name="rl_motor",
@@ -99,7 +101,7 @@ def evaluate_forces(
     tau[8] = -Forces.rr_spring(qdt0[8], qdt1[8])
     tau[9] = -Forces.rl_spring(qdt0[9], qdt1[9])
 
-    rr_throttle = rl_throttle = 1
+    rr_throttle = rl_throttle = 0.8
 
     rr_torque = Forces.motor(rr_wheel_kin, rr_throttle)
     rr_effective_radius = 0.254
@@ -107,20 +109,20 @@ def evaluate_forces(
     rl_torque = Forces.motor(rl_wheel_kin, rl_throttle)
     rl_effective_radius = 0.254
 
-    # tau[12] = rr_torque
-    # tau[13] = rl_torque
+    tau[12] = rr_torque
+    tau[13] = rl_torque
 
-    tau[12] = Forces.motor.torque_control(
-        rr_torque,
-        rr_tire_force[5],
-        rr_effective_radius,
-        Forces.rr_tire.tir_model.Fx,
-    )
-    tau[13] = Forces.motor.torque_control(
-        rl_torque,
-        rl_tire_force[5],
-        rl_effective_radius,
-        Forces.rl_tire.tir_model.Fx,
-    )
+    # tau[12] = Forces.motor.torque_control(
+    #     rr_torque,
+    #     rr_tire_force[5],
+    #     rr_effective_radius,
+    #     Forces.rr_tire.Fx,
+    # )
+    # tau[13] = Forces.motor.torque_control(
+    #     rl_torque,
+    #     rl_tire_force[5],
+    #     rl_effective_radius,
+    #     Forces.rl_tire.Fx,
+    # )
 
     return tau, forces_map

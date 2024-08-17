@@ -48,7 +48,7 @@ if __name__ == "__main__":
     input()
 
     # res = standing_sim(model)
-    res = acceleration_sim(model, 1, 10)
+    res = acceleration_sim(model, 3, 25)
 
     bodies_kinematics = [
         model.forward_kinematics_pass(
