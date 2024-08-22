@@ -1,0 +1,67 @@
+from typing import NamedTuple
+
+import numpy as np
+
+from uraeus.rnea.quaternion.spatial_algebra import (
+    SpatialPose,
+    transform_vector,
+    quaternion_inverse,
+)
+
+
+class RigidBodyData(NamedTuple):
+
+    location: np.ndarray = np.array([0.0, 0.0, 0.0])
+    orientation: np.ndarray = np.array([1.0, 0.0, 0.0, 0.0])
+    mass: float = 0.0
+    inertia_tensor: np.ndarray = np.zeros((3, 3))
+
+
+class BodyKinematics(NamedTuple):
+
+    p_GB: SpatialPose
+    p_BG: SpatialPose
+    v_B: np.ndarray
+    a_B: np.ndarray
+    v_G: np.ndarray
+    a_G: np.ndarray
+
+
+class RigidBody(object):
+
+    body_data: RigidBodyData
+    kinematics: BodyKinematics
+
+    def __init__(self, name: str, body_data: RigidBodyData):
+
+        self.name = name
+        self.body_data = body_data
+        self.I = np.vstack(
+            [
+                np.hstack([body_data.inertia_tensor, np.zeros((3, 3))]),
+                np.hstack([np.zeros((3, 3)), body_data.mass * np.eye(3)]),
+            ]
+        )
+
+        self.kinematics = get_initialized_body_kinematics(
+            body_data.location, body_data.orientation
+        )
+
+
+def get_initialized_body_kinematics(r: np.ndarray, q_GB: np.ndarray) -> BodyKinematics:
+
+    p_GB = SpatialPose(transform_vector(quaternion_inverse(q_GB), r), q_GB)
+    p_BG = p_GB.inv()
+
+    zeros = np.zeros((6,))
+
+    kin = BodyKinematics(
+        p_GB,
+        p_BG,
+        zeros,
+        zeros,
+        zeros,
+        zeros,
+    )
+
+    return kin
