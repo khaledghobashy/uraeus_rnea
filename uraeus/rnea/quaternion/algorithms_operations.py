@@ -23,8 +23,8 @@ def evaluate_successor_kinematics(
     predecessor_kin: BodyKinematics,
     joint_kin: JointKinematics,
 ) -> BodyKinematics:
-    # p_GB = predecessor_kin.p_GB @ joint_kin.p_PS
-    p_GB = joint_kin.p_PS.inv() @ predecessor_kin.p_GB
+    p_GB = predecessor_kin.p_GB @ joint_kin.p_PS
+    # p_GB = joint_kin.p_PS.inv() @ predecessor_kin.p_GB
     p_BG = p_GB.inv()
 
     jax.debug.print("{r}", r=p_GB)

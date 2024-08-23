@@ -125,7 +125,7 @@ def quaternion_multiply(q1, q2):
     t3 = q1_w * q2_z + q1_x * q2_y - q1_y * q2_x + q1_z * q2_w
 
     final_quaternion = jnp.array([t0, t1, t2, t3])
-    return final_quaternion
+    return normalize(final_quaternion)
 
 
 # @jax.jit
@@ -140,6 +140,17 @@ def transform_vector(pdt0F_G: np.ndarray, u_F: np.ndarray):
         - ((v @ v) * u_F)
     )
     return uF_G
+
+
+# # @jax.jit
+# def transform_vector(pdt0F_G: np.ndarray, u_F: np.ndarray):
+#     # w, v = jnp.split(pdt0F_G, [1])
+#     # w = w[0]
+
+#     uF_G = quaternion_multiply(
+#         quaternion_inverse(pdt0F_G), quaternion_multiply(pdt0F_G, np.array([0, *u_F]))
+#     )
+#     return uF_G[1:]
 
 
 @register_pytree_node_class
@@ -175,24 +186,44 @@ class SpatialPose(object):
         # new_q = quaternion_multiply(self.q, other.q)  # transforms from P -> S
 
         # Good code
+        new_q = quaternion_multiply(other.q, self.q)
+        # transforms from P -> S
+        self_r_in_other = transform_vector(other.inv().q, self.r)
+        new_r_in_self = self_r_in_other + other.r
+        new_pose = SpatialPose(new_r_in_self, new_q)
+
+        # new_q = quaternion_multiply(other.q, self.q)
+        # # transforms from P -> S
+        # other_r_in_self = transform_vector(other.inv().q, other.r)
+        # new_r_in_self = other_r_in_self + self.r
+        # new_pose = SpatialPose(new_r_in_self, new_q)
+
+        # new_q = quaternion_multiply(other.q, self.q)
+        # # transforms from P -> S
+        # other_r_in_self = transform_vector(other.inv().q, other.r)
+        # new_r_in_self = other_r_in_self + self.r
+        # new_pose = SpatialPose(new_r_in_self, new_q)
+
+        # print(f"self_r_in_other = {self_r_in_other}")
+        # print(f"other.r = {other.r}")
+        # print(f"new_r_in_self = {new_r_in_self}")
+        # print("")
+
+        # Like old
         # new_q = quaternion_multiply(other.q, self.q)  # transforms from P -> S
         # self_r_in_other = transform_vector(other.inv().q, self.r)
         # new_r_in_self = self_r_in_other + other.r
-        # new_pose = SpatialPose(new_r_in_self, new_q)
-
-        # Like old
-        new_q = quaternion_multiply(other.q, self.q)  # transforms from P -> S
-        self_r_in_other = transform_vector(other.inv().q, self.r)
-        new_r_in_self = self_r_in_other + other.r
-        new_pose = SpatialPose(-transform_vector(new_q, new_r_in_self), new_q)
+        # new_pose = SpatialPose(-transform_vector(new_q, new_r_in_self), new_q)
         return new_pose
 
     def inv(self):
-        q_inv = jnp.array([self.q[0], *(-self.q[1:])])
-        return SpatialPose(transform_vector(q_inv, self.r), q_inv)
+        q_inv = quaternion_inverse(self.q)
+        # p_inv = SpatialPose(transform_vector(q_inv, -self.r), q_inv)
+        p_inv = SpatialPose(-transform_vector(self.q, self.r), q_inv)
+        return p_inv
 
     def __repr__(self) -> str:
-        return f"r = {self.r}, q = {self.q}"
+        return f"r({self.r}), q({self.q})"
 
     def tree_flatten(self):
         return ((self.r, self.q), None)
@@ -200,6 +231,11 @@ class SpatialPose(object):
     @classmethod
     def tree_unflatten(cls, aux_data, args):
         return cls(*args)
+
+
+@jax.jit
+def normalize(v):
+    return v / jnp.sqrt(v @ v)
 
 
 def euler_to_quaternion(roll, pitch, yaw):
@@ -271,13 +307,14 @@ def dcm_to_quaternion(dcm):
 
 @jax.jit
 def quaternion_from_axis_angle(angle: float, axis: np.ndarray):
+    axis = normalize(axis)
     c = jnp.cos(0.5 * angle)
     s = jnp.sin(0.5 * angle)
     return jnp.array([c, *(s * axis)])
 
 
 def quaternion_inverse(q: np.ndarray):
-    return np.array([q[0], *(-q[1:])])
+    return jnp.array([q[0], *(-q[1:])])
 
 
 @jax.jit

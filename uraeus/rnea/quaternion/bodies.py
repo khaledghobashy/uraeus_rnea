@@ -48,10 +48,13 @@ class RigidBody(object):
         )
 
 
-def get_initialized_body_kinematics(r: np.ndarray, q_GB: np.ndarray) -> BodyKinematics:
+def get_initialized_body_kinematics(r: np.ndarray, q_BG: np.ndarray) -> BodyKinematics:
 
-    p_GB = SpatialPose(transform_vector(quaternion_inverse(q_GB), r), q_GB)
-    p_BG = p_GB.inv()
+    # r: position vector of body relative to global-origin expressed in global frame
+    # q_BG transforms from body from to global frame
+
+    p_BG = SpatialPose(transform_vector(quaternion_inverse(q_BG), -r), q_BG)
+    p_GB = p_BG.inv()
 
     zeros = np.zeros((6,))
 

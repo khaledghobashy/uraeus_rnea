@@ -99,8 +99,8 @@ class MultiBodyTree(object):
             joint_data.pos,
             joint_data.z_axis,
             joint_data.x_axis,
-            pred_body.kinematics.p_BG,
-            succ_body.kinematics.p_BG,
+            pred_body.kinematics.p_GB,
+            succ_body.kinematics.p_GB,
         )
 
         joint = construct_joint_instance(
