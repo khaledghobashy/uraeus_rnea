@@ -228,24 +228,36 @@ def initialize_joint(
     location: np.ndarray,
     z_axis: np.ndarray,
     x_axis: np.ndarray,
-    P_p_BG: SpatialPose,
-    S_p_BG: SpatialPose,
+    p_GP: SpatialPose,
+    p_GS: SpatialPose,
 ) -> JointFrames:
 
     z_axis_G = np.array([0, 0, 1])
     rot_axis = np.cross(z_axis_G, z_axis)
     angle = np.arccos(z_axis_G @ z_axis)
-    q_JG = quaternion_from_axis_angle(angle, rot_axis)
+    q_JG = quaternion_from_axis_angle(-angle, rot_axis)
 
-    p_JG = SpatialPose(transform_vector(q_JG, location), q_JG)
+    print("Initializing Joint:")
+    print(f"Joint frame in global = \n", quaternion_to_dcm(q_JG))
+
+    p_JG = SpatialPose(transform_vector(quaternion_inverse(q_JG), -location), q_JG)
+    # p_JG = SpatialPose(transform_vector(q_JG, location), q_JG)
+    print(f"Joint pose in global = \n", p_JG)
     # p_JG = SpatialPose(transform_vector(quaternion_inverse(q_JG), location), q_JG)
     # p_JG = SpatialPose(location, q_JG)
 
-    p_PF = P_p_BG @ p_JG
-    p_SM = S_p_BG @ p_JG
+    # p_PF = p_GP @ p_JG  # P -> F from Predecessor to joint
+    # p_SM = p_GS @ p_JG  # P -> F from Predecessor to joint
+    # p_PF = p_JG.inv() @ p_GP.inv()
+    # p_SM = p_JG.inv() @ p_GS.inv()
+    # p_PF = (p_GP @ p_JG).inv()
+    # p_SM = (p_GS @ p_JG).inv()
+    p_PF = p_GP @ p_JG
+    p_SM = p_GS @ p_JG
 
     print(f"p_PF.r = {p_PF.r}")
-    print(f"p_SM.r = {p_SM.r}")
+    print(f"p_SM.r = {p_SM.inv().r}")
+    print("")
 
     return JointFrames(p_SM, p_PF)
 

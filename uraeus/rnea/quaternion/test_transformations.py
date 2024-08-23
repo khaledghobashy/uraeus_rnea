@@ -218,7 +218,156 @@ def test_2():
     plt.show()
 
 
-# test_2()
+def normalize(v):
+    return v / np.sqrt(v @ v)
+
+
+def test_quaternion_operations():
+    axis1 = np.random.rand(3)
+    axis2 = np.random.rand(3)
+    q1 = quaternion_from_axis_angle(np.radians(45), axis1)
+    q2 = quaternion_from_axis_angle(np.radians(30), axis2)
+    print(f"q1.norm = {np.linalg.norm(q1)}")
+    print(f"q2.norm = {np.linalg.norm(q2)}")
+
+    q12 = quaternion_multiply(q1, q2)
+    q21 = quaternion_multiply(q2, q1)
+    q12_i = quaternion_inverse(q12)
+    q1i2i = quaternion_multiply(quaternion_inverse(q2), quaternion_inverse(q1))
+
+    # print(f"q12 = {q12}")
+    print(f"q12_i = {q12_i}")
+    print(f"q12_i.norm = {np.linalg.norm(q12_i)}")
+    print(f"q1i2i = {q1i2i}")
+    print(f"q1i2i.norm = {np.linalg.norm(q1i2i)}")
+    # print(f"q21 = {q21}")
+
+    p1 = SpatialPose(axis1, q1)
+    p2 = SpatialPose(axis2, q2)
+
+    p12 = p1 @ p2
+    p12_i = p12.inv()
+    p1i2i = p2.inv() @ p1.inv()
+    print(f"p12_i = {p12_i}")
+    print(f"p1i2i = {p1i2i}")
+
+    print(f"p1 @ p1.inv() = {p1 @ p1.inv()}")
+    print(f"p12 @ p12.inv() = {p12 @ p12.inv()}")
+
+    np.testing.assert_almost_equal(
+        np.array((p12 @ p12.inv()).r),
+        np.zeros(
+            3,
+        ),
+    )
+    # np.testing.assert_almost_equal(np.array(p12_i.r), np.array(p1i2i.r))
+    np.testing.assert_almost_equal(np.array(p12_i.q), np.array(p1i2i.q))
+
+
+def test_pose_transformation():
+    q_AB = np.random.rand(4)
+    q_AB = q_AB / np.linalg.norm(q_AB)
+    q_BC = np.random.rand(4)
+    q_BC = q_BC / np.linalg.norm(q_BC)
+
+    print(q_AB, q_BC)
+
+    # R_AB = rot_z(np.radians(35)) @ rot_y(10) @ rot_x(30)
+    # R_BC = rot_z(np.radians(50)) @ rot_y(137) @ rot_x(20)
+
+    R_AB = quaternion_to_dcm(q_AB)
+    R_BC = quaternion_to_dcm(q_BC)
+    R_AC = R_BC @ R_AB
+
+    # q_AB = np.array(dcm_to_quaternion(R_AB), dtype=float)
+    # q_BC = np.array(dcm_to_quaternion(R_BC), dtype=float)
+    q_AC = quaternion_multiply(q_AB, q_BC)
+    print(np.linalg.norm(q_AB), np.linalg.norm(q_BC), np.linalg.norm(q_AC))
+
+    r_AB = R_AB.T @ -np.array([1, 5, 0])
+    r_BC = R_BC.T @ -np.array([0, 1, 13])
+
+    p_AB = SpatialPose(r_AB, q_AB)
+    p_BC = SpatialPose(r_BC, q_BC)
+    p_AC = p_BC @ p_AB
+    p_CA1 = (p_BC @ p_AB).inv()
+    p_CA2 = p_AB.inv() @ p_BC.inv()
+    print(f"p_CA1.r = {p_CA1.r}, {np.linalg.norm(p_CA1.r)}")
+    print(f"p_CA2.r = {p_CA2.r}, {np.linalg.norm(p_CA2.r)}")
+
+    X_AB = spatial_motion_transformation(jnp.array(R_AB, dtype=float), r_AB)
+    X_BC = spatial_motion_transformation(jnp.array(R_BC, dtype=float), r_BC)
+
+    X_AC = X_BC @ X_AB
+    X_CA1 = spatial_transform_transpose(X_AC)
+    X_CA2 = spatial_transform_transpose(X_AB) @ spatial_transform_transpose(X_BC)
+
+    X_AC_ID = get_pose_from_transformation(X_AC @ X_CA1)[3:]
+    p_AC_ID = (p_CA1 @ p_AC).r
+    # p_AC_ID = (p_AC @ p_CA1).r
+    print(f"X_AC_ID = {X_AC_ID}, {np.linalg.norm(X_AC_ID)}")
+    print(f"p_AC_ID = {p_AC_ID}, {np.linalg.norm(p_AC_ID)}")
+    np.testing.assert_almost_equal(np.array(X_CA1), np.array(X_CA2))
+
+    # print(get_pos_from_transformation(X_AB))
+
+    true_pos1 = get_pose_from_transformation(X_AC)[3:]
+    true_pos1T = get_pose_from_transformation(X_CA1)[3:]
+    true_pos2 = get_pos_from_transformation(X_AC)
+
+    print(f"True pose1 = {true_pos1}, {np.linalg.norm(true_pos1)}")
+    print(f"True pose1.T = {true_pos1T}, {np.linalg.norm(true_pos1T)}")
+    print(f"Test pose1 = {-transform_vector(q_AC, true_pos2)}")
+    print(f"True pose2 = {true_pos2}, {np.linalg.norm(true_pos2)}")
+    # print(f"True pose2 = {true_pos2}, {np.linalg.norm(true_pos2)}")
+    print(f"Test pose2 = {p_AC.r}, {np.linalg.norm(p_AC.r)}")
+    # print(f"True quat = {get_orientation_matrix_from_transformation(X_AC)}")
+    print(f"True orientation = \n{R_AC}")
+    print(f"Test orientation = \n{quaternion_to_dcm(p_AC.q)}")
+    print(f"Test orientation = \n{quaternion_to_dcm(q_AC)}")
+    np.testing.assert_almost_equal(quaternion_to_dcm(p_AC.q), np.array(R_AC))
+    # np.testing.assert_almost_equal(quaternion_to_dcm(q_AC), np.array(R_AC))
+    # np.testing.assert_almost_equal(p_AC.q, np.array(dcm_to_quaternion(get_orientation_matrix_from_transformation(X_AC))))
+    np.testing.assert_almost_equal(p_AC.r, np.array(true_pos2))
+
+
+def test_pose_operations():
+
+    q_AB = normalize(np.random.rand(4))
+    q_BC = normalize(np.random.rand(4))
+
+    # r_AB = np.random.rand(3)
+    # r_BC = np.random.rand(3)
+    r_AB = np.array([1, 2, 3])
+    r_BC = np.array([5, 6, 7])
+    r_AC = r_AB + r_BC
+
+    print(f"r_AB_G = {r_AB}")
+    print(f"r_BC_G = {r_BC}")
+    print(f"r_AC_G = {r_AC}, norm = {np.linalg.norm(r_AC)}")
+
+    p_AB = SpatialPose(r_AB, q_AB)
+    p_BC = SpatialPose(transform_vector(q_AB, r_BC), q_BC)
+
+    p_AC = p_BC @ p_AB
+    p_AC_inv1 = (p_BC @ p_AB).inv()
+    p_AC_inv2 = p_AB.inv() @ p_BC.inv()
+
+    p_I1 = p_AC @ p_AC_inv1
+    p_I2 = p_AC @ p_AC_inv2
+
+    # print(f"r_AC_G = {transform_vector(p_AC.inv().q, p_AC.)}")
+
+    print(f"p_AC = {p_AC}")
+    print(f"r_AC_G = {p_AC_inv1.inv().r}, norm = {np.linalg.norm(p_AC_inv1.inv().r)}")
+    print(
+        f"r_AC_G = {transform_vector(p_AC_inv1.q, p_AC_inv1.r)}, norm = {np.linalg.norm(p_AC_inv1.inv().r)}"
+    )
+    print(f"p_AC_inv1 = {p_AC_inv1}, norm = {np.linalg.norm(p_AC_inv1.r)}")
+    print(f"p_AC_inv2 = {p_AC_inv2}, norm = {np.linalg.norm(p_AC_inv2.r)}")
+    print(f"p_I1 = {p_I1}")
+    print(f"p_I2 = {p_I2}")
+
 
 if __name__ == "__main__":
 
@@ -245,4 +394,8 @@ if __name__ == "__main__":
 
     # test_successive_transform()
 
-    test_quaternion_transformation()
+    # test_quaternion_transformation()
+
+    # test_quaternion_operations()
+    test_pose_transformation()
+    # test_pose_operations()

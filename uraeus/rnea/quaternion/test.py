@@ -125,12 +125,13 @@ if __name__ == "__main__":
     l1_data = RigidBodyData(np.array([0, 0, -5]), np.array([1, 0, 0, 0]), 1, np.eye(3))
     l2_data = RigidBodyData(np.array([0, 0, -10]), np.array([1, 0, 0, 0]), 1, np.eye(3))
     j1_data = JointConfigInputs(np.array([0, 0, 0]), np.array([1, 0, 0]), None)
-    j2_data = JointConfigInputs(np.array([0, 0, 0]), np.array([1, 0, 0]), None)
+    j2_data = JointConfigInputs(np.array([0, 0, -5]), np.array([1, 0, 0]), None)
 
     tree.add_joint("j1", "ground", "l1", l1_data, RevoluteJoint, j1_data)
     tree.add_joint("j2", "l1", "l2", l2_data, RevoluteJoint, j2_data)
 
     model = Model(tree)
+    # exit()
     # bodies_kinematics, joints_kinematics = model.forward_kinematics_pass(
     #     np.array([np.radians(0), np.radians(90)]), np.array([0, 0]), np.array([0, 0])
     # )
@@ -144,9 +145,9 @@ if __name__ == "__main__":
     angles = np.linspace(0, 2 * np.pi, 100)
     bodies_kinematics = [
         model.forward_kinematics_pass(
-            # np.array([0 * np.radians(45) * np.sin(i), (2 * i)]),
+            np.array([np.radians(45) * np.sin(i), (2 * i)]),
             # np.array([i, 0]),
-            np.array([i, 0]),
+            # np.array([i, i]),
             np.array([0, 0]),
             np.array([0, 0]),
         )[0]
@@ -157,10 +158,10 @@ if __name__ == "__main__":
     # print(l2_kin.p_GB)
 
     l1_pose_G = [
-        model.get_body_kinematics("l1", bodies).p_GB for bodies in bodies_kinematics
+        model.get_body_kinematics("l1", bodies).p_BG for bodies in bodies_kinematics
     ]
     l2_pose_G = [
-        model.get_body_kinematics("l2", bodies).p_GB for bodies in bodies_kinematics
+        model.get_body_kinematics("l2", bodies).p_BG for bodies in bodies_kinematics
     ]
 
     # l1_r_G = [transform_vector(p.q, p.r) for p in l1_pose_G]
@@ -191,17 +192,17 @@ if __name__ == "__main__":
     # ax.legend()
     # plt.show()
 
-    # def animate(i):
-    #     print(angles[i])
-    #     plt.cla()
-    #     plt.grid()
-    #     plt.xlim([-10, 10])
-    #     plt.ylim([-10, 10])
-    #     plt.plot(l1_r_y[i], l1_r_z[i])
-    #     plt.plot(l1_r_y[i], l1_r_z[i], "o")
-    #     return
+    def animate(i):
+        print(angles[i])
+        plt.cla()
+        plt.grid()
+        plt.xlim([-10, 10])
+        plt.ylim([-10, 10])
+        plt.plot(l1_r_y[i], l1_r_z[i])
+        plt.plot(l1_r_y[i], l1_r_z[i], "o")
+        return
 
-    # fig = plt.figure(figsize=(10, 10))
-    # plt.grid()
-    # ani = animation.FuncAnimation(fig, animate, frames=99, interval=50)
-    # plt.show()
+    fig = plt.figure(figsize=(10, 10))
+    plt.grid()
+    ani = animation.FuncAnimation(fig, animate, frames=99, interval=50)
+    plt.show()
