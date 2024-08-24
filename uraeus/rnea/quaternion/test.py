@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import NamedTuple, Dict, Tuple, List, Callable
 import numpy as np
+import jax.numpy as jnp
+import jax
 
 from uraeus.rnea.quaternion.spatial_algebra import quaternion_to_dcm, transform_vector
 from uraeus.rnea.quaternion.bodies import RigidBody, RigidBodyData, BodyKinematics
@@ -142,48 +144,54 @@ if __name__ == "__main__":
     # print(f"l1.r_G = {transform_vector(l1_kin.p_GB.q, l1_kin.p_GB.r)}")
     # print(f"l2.r_G = {transform_vector(l2_kin.p_GB.q, l2_kin.p_GB.r)}")
 
-    angles = np.linspace(0, 2 * np.pi, 100)
+    # theta1_dt0 = lambda t: jnp.radians(45) * jnp.sin(t)
+    theta1_dt0 = lambda t: t
+    theta2_dt0 = lambda t: 0
+
+    theta1_dt1 = jax.jacfwd(theta1_dt0)
+    theta2_dt1 = jax.jacfwd(theta2_dt0)
+
+    time_array = np.linspace(0, 2 * np.pi, 100)
     bodies_kinematics = [
         model.forward_kinematics_pass(
-            np.array([np.radians(45) * np.sin(i), (2 * i)]),
+            np.array([theta1_dt0(t), theta2_dt0(t)]),
             # np.array([i, 0]),
             # np.array([i, i]),
-            np.array([0, 0]),
+            np.array([theta1_dt1(t), theta2_dt1(t)]),
             np.array([0, 0]),
         )[0]
-        for i in angles
+        for t in time_array
+        # for t in time_array[0:1]
     ]
 
     # print(l1_kin.p_GB)
     # print(l2_kin.p_GB)
 
     l1_pose_G = [
-        model.get_body_kinematics("l1", bodies).p_BG for bodies in bodies_kinematics
+        model.get_body_kinematics("l1", bodies).p_GB for bodies in bodies_kinematics
     ]
     l2_pose_G = [
-        model.get_body_kinematics("l2", bodies).p_BG for bodies in bodies_kinematics
+        model.get_body_kinematics("l2", bodies).p_GB for bodies in bodies_kinematics
     ]
 
-    # l1_r_G = [transform_vector(p.q, p.r) for p in l1_pose_G]
-    # l2_r_G = [transform_vector(p.q, p.r) for p in l2_pose_G]
+    l1_v_G = [
+        model.get_body_kinematics("l1", bodies).v_G for bodies in bodies_kinematics
+    ]
+    l2_v_G = [
+        model.get_body_kinematics("l2", bodies).v_G for bodies in bodies_kinematics
+    ]
 
     l1_r_G = [p.r for p in l1_pose_G]
     l2_r_G = [p.r for p in l2_pose_G]
 
     l1_r_y = [(0, float(r1[1]), float(r2[1])) for r1, r2 in zip(l1_r_G, l2_r_G)]
     l1_r_z = [(0, float(r1[2]), float(r2[2])) for r1, r2 in zip(l1_r_G, l2_r_G)]
-    # l1_r_z = [kin.p_BG.r[2] for kin in l1_kin]
-    # l2_r_y = [kin.p_BG.r[1] for kin in l2_kin]
-    # l2_r_z = [kin.p_BG.r[2] for kin in l2_kin]
 
-    # print(l1_kin.p_BG)
-    # print(l2_kin.p_BG)
+    l1_v_y = [v[1] for v in l1_v_G]
+    l1_v_z = [v[2] for v in l1_v_G]
 
-    # print(quaternion_to_dcm(l1_kin.p_BG.q))
-    # print(quaternion_to_dcm(l2_kin.p_BG.q))
-
-    print(l1_r_y[0])
-    print(l1_r_z[0])
+    l2_v_y = [v[1] for v in l2_v_G]
+    l2_v_z = [v[2] for v in l2_v_G]
 
     # fig, ax = plt.subplots()
     # # scat = ax.scatter(l1_r_y[0], l1_r_z[0])
@@ -193,7 +201,7 @@ if __name__ == "__main__":
     # plt.show()
 
     def animate(i):
-        print(angles[i])
+        print(time_array[i])
         plt.cla()
         plt.grid()
         plt.xlim([-10, 10])
@@ -205,4 +213,12 @@ if __name__ == "__main__":
     fig = plt.figure(figsize=(10, 10))
     plt.grid()
     ani = animation.FuncAnimation(fig, animate, frames=99, interval=50)
+    plt.show()
+
+    fig = plt.figure(figsize=(10, 10))
+    plt.plot(time_array, l1_v_y)
+    plt.plot(time_array, l1_v_z)
+    plt.plot(time_array, l2_v_y)
+    plt.plot(time_array, l2_v_z)
+    plt.grid()
     plt.show()

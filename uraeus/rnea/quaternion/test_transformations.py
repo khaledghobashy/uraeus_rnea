@@ -17,6 +17,7 @@ from uraeus.rnea.quaternion.spatial_algebra import (
     rot_z,
     SpatialPose,
     transform_vector,
+    transform_screw,
     dcm_to_quaternion,
     quaternion_to_dcm,
     quaternion_multiply,
@@ -331,20 +332,20 @@ def test_pose_transformation():
     np.testing.assert_almost_equal(p_AC.r, np.array(true_pos2))
 
 
-def test_pose_operations():
-
+def test_pose_inverse_operations():
+    print("Testing SpatialPose Inverse Operations!")
     q_AB = normalize(np.random.rand(4))
     q_BC = normalize(np.random.rand(4))
 
-    # r_AB = np.random.rand(3)
-    # r_BC = np.random.rand(3)
-    r_AB = np.array([1, 2, 3])
-    r_BC = np.array([5, 6, 7])
+    r_AB = np.random.rand(3)
+    r_BC = np.random.rand(3)
+    # r_AB = np.array([1, 2, 3])
+    # r_BC = np.array([5, 6, 7])
     r_AC = r_AB + r_BC
 
-    print(f"r_AB_G = {r_AB}")
-    print(f"r_BC_G = {r_BC}")
-    print(f"r_AC_G = {r_AC}, norm = {np.linalg.norm(r_AC)}")
+    # print(f"r_AB_G = {r_AB}")
+    # print(f"r_BC_G = {r_BC}")
+    # print(f"r_AC_G = {r_AC}, norm = {np.linalg.norm(r_AC)}")
 
     p_AB = SpatialPose(r_AB, q_AB)
     p_BC = SpatialPose(transform_vector(q_AB, r_BC), q_BC)
@@ -356,17 +357,34 @@ def test_pose_operations():
     p_I1 = p_AC @ p_AC_inv1
     p_I2 = p_AC @ p_AC_inv2
 
+    p_I0 = SpatialPose.Identity()
+
     # print(f"r_AC_G = {transform_vector(p_AC.inv().q, p_AC.)}")
 
-    print(f"p_AC = {p_AC}")
-    print(f"r_AC_G = {p_AC_inv1.inv().r}, norm = {np.linalg.norm(p_AC_inv1.inv().r)}")
-    print(
-        f"r_AC_G = {transform_vector(p_AC_inv1.q, p_AC_inv1.r)}, norm = {np.linalg.norm(p_AC_inv1.inv().r)}"
-    )
-    print(f"p_AC_inv1 = {p_AC_inv1}, norm = {np.linalg.norm(p_AC_inv1.r)}")
-    print(f"p_AC_inv2 = {p_AC_inv2}, norm = {np.linalg.norm(p_AC_inv2.r)}")
-    print(f"p_I1 = {p_I1}")
-    print(f"p_I2 = {p_I2}")
+    # print(f"p_AC = {p_AC}")
+    # print(f"r_AC_G = {p_AC_inv1.inv().r}, norm = {np.linalg.norm(p_AC_inv1.inv().r)}")
+    # print(
+    #     f"r_AC_G = {transform_vector(p_AC_inv1.q, p_AC_inv1.r)}, norm = {np.linalg.norm(p_AC_inv1.inv().r)}"
+    # )
+    # print(f"p_AC_inv1 = {p_AC_inv1}, norm = {np.linalg.norm(p_AC_inv1.r)}")
+    # print(f"p_AC_inv2 = {p_AC_inv2}, norm = {np.linalg.norm(p_AC_inv2.r)}")
+    # print(f"p_I1 = {p_I1}")
+    # print(f"p_I2 = {p_I2}")
+
+    np.testing.assert_almost_equal(np.array(p_AC_inv1.r), np.array(p_AC_inv2.r))
+    np.testing.assert_almost_equal(np.array(p_AC_inv1.q), np.array(p_AC_inv2.q))
+    np.testing.assert_almost_equal(np.array(p_I1.r), np.array(p_I0.r))
+    np.testing.assert_almost_equal(np.array(p_I1.q), np.array(p_I0.q))
+    np.testing.assert_almost_equal(np.array(p_I2.r), np.array(p_I0.r))
+    np.testing.assert_almost_equal(np.array(p_I2.q), np.array(p_I0.q))
+
+
+def test_screw_operations():
+
+    v_A = np.array([0, 0, 0, 1, 0, 0])
+    p_AB = SpatialPose(np.array([5, 0, 0]), np.array([0.70710678, 0, -0.70710678, 0]))
+    v_B = transform_screw(p_AB, v_A)
+    print(v_B)
 
 
 if __name__ == "__main__":
@@ -397,5 +415,7 @@ if __name__ == "__main__":
     # test_quaternion_transformation()
 
     # test_quaternion_operations()
-    test_pose_transformation()
+    # test_pose_transformation()
     # test_pose_operations()
+    # test_pose_inverse_operations()
+    test_screw_operations()

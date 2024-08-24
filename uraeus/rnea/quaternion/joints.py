@@ -17,6 +17,7 @@ from uraeus.rnea.quaternion.spatial_algebra import (
     quaternion_to_dcm,
     quaternion_from_axis_angle,
     transform_vector,
+    transform_screw,
     quaternion_inverse,
 )
 
@@ -181,8 +182,7 @@ def evaluate_joint_kinematics(
 
     p_FM, S_FM, v_J, a_J = mobilizer_kinematics
 
-    p_PS = p_PF @ p_FM @ p_SM.inv()
-    # p_PS = p_FM
+    p_PS = p_SM.inv() @ p_FM @ p_PF
     p_SP = p_PS.inv()
 
     # print(f"p_PF = {p_PF}")
@@ -191,9 +191,14 @@ def evaluate_joint_kinematics(
     # print(f"p_PS = {p_PS}")
     # print("")
 
+    v_J = transform_screw(p_SM.inv(), v_J)
+    jax.debug.print("mobilizer.v_J = {x}", x=mobilizer_kinematics.v_J)
+    jax.debug.print("transform_screw(p_SM.inv(), v_J) = {x}", x=v_J)
+    jax.debug.print("\n")
     # v_J = X_SM @ v_J
 
     # a_J = X_SM @ a_J
+    # a_J = transform_screw(p_SM.inv(), a_J)
 
     kinematics = JointKinematics(p_FM, p_SP, p_PS, S_FM, v_J, a_J)
 
@@ -252,14 +257,17 @@ def initialize_joint(
     # p_SM = p_JG.inv() @ p_GS.inv()
     # p_PF = (p_GP @ p_JG).inv()
     # p_SM = (p_GS @ p_JG).inv()
-    p_PF = p_GP @ p_JG
-    p_SM = p_GS @ p_JG
+    p_FP = p_GP @ p_JG
+    p_MS = p_GS @ p_JG
 
-    print(f"p_PF.r = {p_PF.r}")
-    print(f"p_SM.r = {p_SM.inv().r}")
-    print("")
+    print(f"p_MS = \n", p_MS)
+    print(f"p_SM = \n", p_MS.inv())
+    # print(f"p_MS = \n", quaternion_to_dcm(p_MS.q))
+    # print(f"p_PF.r = {p_PF.r}")
+    # print(f"p_SM.r = {p_SM.inv().r}")
+    print("\n")
 
-    return JointFrames(p_SM, p_PF)
+    return JointFrames(p_MS.inv(), p_FP.inv())
 
 
 def orthogonal_vector(v: np.ndarray):
