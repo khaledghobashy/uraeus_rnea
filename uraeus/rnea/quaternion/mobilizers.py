@@ -10,6 +10,7 @@ import numpy as np
 
 from uraeus.rnea.quaternion.spatial_algebra import (
     SpatialPose,
+    SpatialScrew,
     rot_x,
     rot_y,
     rot_z,
@@ -217,17 +218,17 @@ class RevoluteMobilizer(CustomMobilizer):
 
     @partial(jax.jit, static_argnums=(0,))
     def S_FM(self, qdt0: np.ndarray) -> np.ndarray:
-        return np.array([0, 0, 1, 0, 0, 0])[:, None]
+        return np.array([0, 0, 0, 0, 0, 1])[:, None]
 
     @partial(jax.jit, static_argnums=(0,))
     def v_J(self, qdt0: np.ndarray, qdt1: np.ndarray) -> np.ndarray:
         psi_dt1 = qdt1[0]
-        return jnp.array([0, 0, psi_dt1, 0, 0, 0])
+        return jnp.array([0, 0, 0, 0, 0, psi_dt1])
 
     @partial(jax.jit, static_argnums=(0,))
     def a_J(self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray) -> np.ndarray:
         psi_dt2 = qdt2[0]
-        return jnp.array([0, 0, psi_dt2, 0, 0, 0])
+        return jnp.array([0, 0, 0, 0, 0, psi_dt2])
 
     @partial(jax.jit, static_argnums=(0,))
     def evaluate_kinematics(

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Tuple
 import itertools
 
@@ -231,6 +232,67 @@ class SpatialPose(object):
     @classmethod
     def tree_unflatten(cls, aux_data, args):
         return cls(*args)
+
+    @staticmethod
+    def Identity() -> SpatialPose:
+        return SpatialPose(np.zeros(3), np.array([1, 0, 0, 0]))
+
+
+@register_pytree_node_class
+class SpatialScrew(object):
+
+    r: np.ndarray
+    w: np.ndarray
+
+    def __init__(self, r: np.ndarray, w: np.ndarray):
+        self.r = r
+        self.w = w
+
+    def tree_flatten(self):
+        return ((self.r, self.w), None)
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, args):
+        return cls(*args)
+
+
+# def transform_screw(pose: SpatialPose, screw: SpatialScrew) -> SpatialScrew:
+#     r, w = jnp.split(2)
+#     new_r = transform_vector(pose.q, screw.r) + (skew_M @ pose.r @ screw.w)
+#     new_w = transform_vector(pose.q, screw.w)
+#     return SpatialScrew(new_r, new_w)
+
+
+@jax.jit
+def transform_screw(pose: SpatialPose, screw: np.ndarray) -> np.ndarray:
+    v, w = jnp.split(screw, 2)
+    pose_r_inv = pose.inv().r
+    new_w = transform_vector(pose.q, w)
+    new_v = transform_vector(pose.q, v) + ((skew_M @ pose.r) @ w)
+    new_v = transform_vector(pose.q, v) + transform_vector(
+        pose.q, ((skew_M @ pose.r) @ w)
+    )
+    # new_r = transform_vector(pose.q, r) + jnp.cross(new_w, pose.r)
+
+    jax.debug.print("screw = {x}", x=screw)
+    jax.debug.print("pose.r = {x}", x=pose.r)
+    jax.debug.print("pose.inv().r = {x}", x=pose.inv().r)
+    jax.debug.print("v.linear = {x}", x=transform_vector(pose.q, v))
+    jax.debug.print("v.angular = {x}", x=((skew_M @ pose_r_inv) @ new_w))
+    jax.debug.print("new_v = {new_r}", new_r=new_v)
+    jax.debug.print("new_w = {new_w}", new_w=new_w)
+
+    new_screw = jnp.array([*new_v, *new_w])
+    return new_screw
+
+
+@jax.jit
+def express_screw(pose: SpatialPose, screw: np.ndarray) -> np.ndarray:
+    v, w = jnp.split(screw, 2)
+    new_w = transform_vector(pose.q, w)
+    new_v = transform_vector(pose.q, v)
+    new_screw = jnp.array([*new_v, *new_w])
+    return new_screw
 
 
 @jax.jit

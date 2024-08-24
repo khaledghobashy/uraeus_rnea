@@ -9,6 +9,9 @@ from uraeus.rnea.quaternion.spatial_algebra import (
     skew_M,
     SpatialPose,
     quaternion_to_dcm,
+    transform_screw,
+    transform_vector,
+    express_screw,
 )
 from uraeus.rnea.quaternion.bodies import BodyKinematics
 from uraeus.rnea.quaternion.joints import (
@@ -23,13 +26,23 @@ def evaluate_successor_kinematics(
     predecessor_kin: BodyKinematics,
     joint_kin: JointKinematics,
 ) -> BodyKinematics:
-    p_GB = predecessor_kin.p_GB @ joint_kin.p_PS
-    # p_GB = joint_kin.p_PS.inv() @ predecessor_kin.p_GB
+    # p_GB = predecessor_kin.p_GB @ joint_kin.p_PS
+    p_GB = joint_kin.p_PS @ predecessor_kin.p_GB
     p_BG = p_GB.inv()
 
-    jax.debug.print("{r}", r=p_GB)
+    # jax.debug.print("{r}", r=p_GB)
 
-    # v_B = (joint_kin.p_SP @ predecessor_kin.v_B) + joint_kin.v_J
+    v_B = transform_screw(joint_kin.p_PS, predecessor_kin.v_B) + joint_kin.v_J
+    v_GB = express_screw(p_BG, v_B)
+
+    # jax.debug.print("joint_kin.v_J = {x}", x=joint_kin.v_J)
+    # jax.debug.print("predecessor_kin.v_B = {x}", x=predecessor_kin.v_B)
+    # jax.debug.print(
+    #     "transform_screw(joint_kin.p_PS, predecessor_kin.v_B) = {x}",
+    #     x=transform_screw(joint_kin.p_PS, predecessor_kin.v_B),
+    # )
+    # jax.debug.print("v_B = {x}", x=v_B)
+    # jax.debug.print("\n")
 
     # a_B = (
     #     (joint_kin.X_SP @ predecessor_kin.a_B)
@@ -41,7 +54,7 @@ def evaluate_successor_kinematics(
     # v_s0 = translational_spatial_vector(v_B)
     # a_GB = spatial_motion_rotation(R_GB) @ (a_B - cross(v_s0, v_B))
 
-    v_GB = v_B = np.zeros((6,))
+    # v_GB = v_B = np.zeros((6,))
     a_GB = a_B = np.zeros((6,))
 
     successor_kin = BodyKinematics(p_GB, p_BG, v_B, a_B, v_GB, a_GB)
