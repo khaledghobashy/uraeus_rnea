@@ -26,23 +26,11 @@ def evaluate_successor_kinematics(
     predecessor_kin: BodyKinematics,
     joint_kin: JointKinematics,
 ) -> BodyKinematics:
-    # p_GB = predecessor_kin.p_GB @ joint_kin.p_PS
     p_GB = joint_kin.p_PS @ predecessor_kin.p_GB
     p_BG = p_GB.inv()
 
-    # jax.debug.print("{r}", r=p_GB)
-
     v_B = transform_screw(joint_kin.p_PS, predecessor_kin.v_B) + joint_kin.v_J
     v_GB = express_screw(p_BG, v_B)
-
-    # jax.debug.print("joint_kin.v_J = {x}", x=joint_kin.v_J)
-    # jax.debug.print("predecessor_kin.v_B = {x}", x=predecessor_kin.v_B)
-    # jax.debug.print(
-    #     "transform_screw(joint_kin.p_PS, predecessor_kin.v_B) = {x}",
-    #     x=transform_screw(joint_kin.p_PS, predecessor_kin.v_B),
-    # )
-    # jax.debug.print("v_B = {x}", x=v_B)
-    # jax.debug.print("\n")
 
     a_B = (
         transform_screw(joint_kin.p_PS, predecessor_kin.a_B)
