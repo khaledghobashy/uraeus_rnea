@@ -63,11 +63,14 @@ class DoublePendulumTest(unittest.TestCase):
 
     def setUp(self):
 
-        self.l1 = 5
-        self.l2 = 5
+        self.l1 = 4
+        self.l2 = 13
+
+        self.m1 = 1
+        self.m2 = 1
 
         self.theta1_dt0_f = lambda t: 2 * jnp.sin(t)
-        self.theta2_dt0_f = lambda t: t
+        self.theta2_dt0_f = lambda t: 1.5 * jnp.sin(2 * t)
 
         self.theta1_dt1_f = jax.jacfwd(self.theta1_dt0_f)
         self.theta2_dt1_f = jax.jacfwd(self.theta2_dt0_f)

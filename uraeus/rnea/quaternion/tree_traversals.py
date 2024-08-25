@@ -21,7 +21,7 @@ from uraeus.rnea.quaternion.algorithms_operations import (
     evaluate_joint_inertia_force,
     evaluate_successor_kinematics,
 )
-from uraeus.rnea.quaternion.spatial_algebra import SpatialPose
+from uraeus.rnea.quaternion.spatial_algebra import transform_screw_force
 from uraeus.rnea.quaternion.graphs import (
     accumulate_leaf_to_root,
     accumulate_root_to_leaf,
@@ -43,7 +43,9 @@ def edge_force_func(
     transforms: List[np.ndarray],
     out_forces: List[np.ndarray],
 ):
-    return successor_force + sum(map(jnp.dot, transforms, out_forces), np.zeros((6,)))
+    return successor_force + sum(
+        map(transform_screw_force, transforms, out_forces), np.zeros((6,))
+    )
 
 
 root_to_leaf = accumulate_root_to_leaf(
@@ -84,13 +86,8 @@ def tip_to_base(
         )
     )
 
-    # TODO(kgh): Introduce proper transformation
-    motion_to_force_transform = lambda i: i
-
     # Extract joints' transforms from joints' kinematics
-    forces_transforms = [
-        motion_to_force_transform(j.X_PS) for j in reversed(joints_kinematics)
-    ]
+    forces_transforms = [j.p_SP for j in reversed(joints_kinematics)]
 
     # Traverse the tree tip-to-base and Evaluate joints' forces
     joints_forces = list(
@@ -103,7 +100,7 @@ def tip_to_base(
 
 
 dot = jax.vmap(jnp.dot)
-dot = np.dot
+# dot = np.dot
 
 
 # #@jax.jit
@@ -113,17 +110,14 @@ def evaluate_tau(
     joints_forces: List[np.ndarray],
 ) -> np.ndarray:
 
-    # TODO(kgh): Introduce proper transformation
-    motion_to_force_transform = lambda i: i
-    forces_transforms_p_MS = map(
-        motion_to_force_transform, [j.p_SM.inv() for j in joints_frames]
-    )
-    # fi_Ms = map(jnp.dot, forces_transforms_X_MS, joints_forces)
-    fi_Ms = dot(jnp.stack(list(forces_transforms_p_MS)), jnp.stack(joints_forces))
+    forces_transforms_p_SM = [j.p_SM for j in joints_frames]
+    fi_Ms = list(map(transform_screw_force, forces_transforms_p_SM, joints_forces))
     taus = map(jnp.dot, [j.S_FM.T for j in joints_kinematics], fi_Ms)
-    # taus = dot(jnp.stack([j.S_FM.T for j in joints_kinematics]), fi_Ms)
     tau = jnp.hstack(list(taus))
-    # tau = np.hstack([(j.S_FM.T @ fi_M) for j, fi_M in zip(joints_kinematics, fi_Ms)])
+    print(joints_forces)
+    print(fi_Ms)
+    print(tau)
+    print("")
 
     return tau
 

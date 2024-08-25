@@ -38,8 +38,8 @@ class RigidBody(object):
         self.body_data = body_data
         self.I = np.vstack(
             [
-                np.hstack([body_data.inertia_tensor, np.zeros((3, 3))]),
-                np.hstack([np.zeros((3, 3)), body_data.mass * np.eye(3)]),
+                np.hstack([body_data.mass * np.eye(3), np.zeros((3, 3))]),
+                np.hstack([np.zeros((3, 3)), body_data.inertia_tensor]),
             ]
         )
 
