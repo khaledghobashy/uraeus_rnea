@@ -272,15 +272,6 @@ def transform_screw(pose: SpatialPose, screw: np.ndarray) -> np.ndarray:
     new_v = transform_vector(pose.q, v) + transform_vector(
         pose.q, ((skew_M @ pose.r) @ w)
     )
-    # new_r = transform_vector(pose.q, r) + jnp.cross(new_w, pose.r)
-
-    jax.debug.print("screw = {x}", x=screw)
-    jax.debug.print("pose.r = {x}", x=pose.r)
-    jax.debug.print("pose.inv().r = {x}", x=pose.inv().r)
-    jax.debug.print("v.linear = {x}", x=transform_vector(pose.q, v))
-    jax.debug.print("v.angular = {x}", x=((skew_M @ pose_r_inv) @ new_w))
-    jax.debug.print("new_v = {new_r}", new_r=new_v)
-    jax.debug.print("new_w = {new_w}", new_w=new_w)
 
     new_screw = jnp.array([*new_v, *new_w])
     return new_screw
