@@ -266,12 +266,22 @@ class SpatialScrew(object):
 @jax.jit
 def transform_screw(pose: SpatialPose, screw: np.ndarray) -> np.ndarray:
     v, w = jnp.split(screw, 2)
-    pose_r_inv = pose.inv().r
     new_w = transform_vector(pose.q, w)
-    new_v = transform_vector(pose.q, v) + ((skew_M @ pose.r) @ w)
     new_v = transform_vector(pose.q, v) + transform_vector(
         pose.q, ((skew_M @ pose.r) @ w)
     )
+
+    new_screw = jnp.array([*new_v, *new_w])
+    return new_screw
+
+
+@jax.jit
+def transform_screw_force(pose: SpatialPose, screw: np.ndarray) -> np.ndarray:
+    v, w = jnp.split(screw, 2)
+    new_w = transform_vector(pose.q, w) + transform_vector(
+        pose.q, ((skew_M @ pose.r) @ v)
+    )
+    new_v = transform_vector(pose.q, v)
 
     new_screw = jnp.array([*new_v, *new_w])
     return new_screw

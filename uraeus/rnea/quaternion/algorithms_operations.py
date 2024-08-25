@@ -12,6 +12,7 @@ from uraeus.rnea.quaternion.spatial_algebra import (
     transform_screw,
     transform_vector,
     express_screw,
+    transform_screw_force,
 )
 from uraeus.rnea.quaternion.bodies import BodyKinematics
 from uraeus.rnea.quaternion.joints import (
@@ -57,23 +58,32 @@ def spatial_cross(v1: np.ndarray, v2: np.ndarray) -> np.ndarray:
     return -jnp.array([*v3_v, *v3_w])
 
 
+@jax.jit
+def force_spatial_cross(v1: np.ndarray, v2: np.ndarray) -> np.ndarray:
+
+    v1_v, v1_w = jnp.split(v1, 2)
+    v2_v, v2_w = jnp.split(v2, 2)
+
+    v3_v = skew_M @ v1_w @ v2_v
+    v3_w = (skew_M @ v1_w @ v2_w) + (skew_M @ v1_v @ v2_v)
+
+    return -jnp.array([*v3_v, *v3_w])
+
+
 # @jax.jit
 def evaluate_joint_inertia_force(
     successor_kin: BodyKinematics,
     successor_I: np.ndarray,
     external_forces: List[np.ndarray],
 ) -> np.ndarray:
-    # fb_S = (successor_I @ successor_kin.a_B) + (
-    #     motion_to_force_transform(spatial_skew(successor_kin.v_B))
-    #     @ (successor_I @ successor_kin.v_B)
-    # )
-    # R_BG = get_orientation_matrix_from_transformation(successor_kin.X_BG)
-    # E_BG = spatial_motion_rotation(R_BG)
-    # fe_S = motion_to_force_transform(E_BG) @ sum(external_forces, np.zeros((6,)))
+    fb_S = (successor_I @ successor_kin.a_B) + force_spatial_cross(
+        successor_kin.v_B, (successor_I @ successor_kin.v_B)
+    )
+    fe_S = express_screw(successor_kin.p_GB, sum(external_forces, np.zeros((6,))))
 
-    # f = fb_S - fe_S
+    f = fb_S - fe_S
 
-    return np.zeros((6,))
+    return f
 
 
 # @jax.jit
@@ -84,8 +94,7 @@ def construct_mobilizer_force(
     successor_kin: BodyKinematics,
 ) -> MobilizerForces:
     fc_S, fa_S, tau = extract_force_components(fi_S, joint_frames, joint_kin)
-    E_GB = quaternion_to_dcm(successor_kin.p_GB)
-    fc_G = E_GB @ fc_S
+    fc_G = express_screw(successor_kin.p_BG, fc_S)
 
     return MobilizerForces(fi_S, fc_S, fa_S, fc_G, tau)
 
@@ -96,17 +105,15 @@ def extract_force_components(
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     p_SM = joint_frames.p_SM
     p_MS = p_SM.inv()
-    E_SM = quaternion_to_dcm(p_MS)
 
-    # fi_M = motion_to_force_transform(X_MS) @ fi_S
-    fi_M = np.zeros((6,))
+    fi_M = transform_screw_force(p_SM, fi_S)
     tau = joint_kin.S_FM.T @ fi_M
 
     fa_M = joint_kin.S_FM @ tau
     fc_M = fi_M - fa_M
 
-    fc_S = E_SM @ fc_M
-    fa_S = E_SM @ fa_M
+    fc_S = express_screw(p_MS, fc_M)
+    fa_S = express_screw(p_MS, fa_M)
 
     return fc_S, fa_S, tau
 
