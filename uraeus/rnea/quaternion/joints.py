@@ -198,7 +198,7 @@ def evaluate_joint_kinematics(
     # v_J = X_SM @ v_J
 
     # a_J = X_SM @ a_J
-    # a_J = transform_screw(p_SM.inv(), a_J)
+    a_J = transform_screw(p_SM.inv(), a_J)
 
     kinematics = JointKinematics(p_FM, p_SP, p_PS, S_FM, v_J, a_J)
 

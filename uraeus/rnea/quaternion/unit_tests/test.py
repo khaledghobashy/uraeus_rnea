@@ -145,7 +145,7 @@ if __name__ == "__main__":
     # print(f"l2.r_G = {transform_vector(l2_kin.p_GB.q, l2_kin.p_GB.r)}")
 
     # theta1_dt0 = lambda t: jnp.radians(45) * jnp.sin(t)
-    theta1_dt0 = lambda t: t
+    theta1_dt0 = lambda t: 2 * jnp.sin(t)
     theta2_dt0 = lambda t: t
 
     theta1_dt1 = jax.jacfwd(theta1_dt0)
@@ -181,6 +181,13 @@ if __name__ == "__main__":
         model.get_body_kinematics("l2", bodies).v_G for bodies in bodies_kinematics
     ]
 
+    l1_a_G = [
+        model.get_body_kinematics("l1", bodies).a_G for bodies in bodies_kinematics
+    ]
+    l2_a_G = [
+        model.get_body_kinematics("l2", bodies).a_G for bodies in bodies_kinematics
+    ]
+
     l1_r_G = [p.r for p in l1_pose_G]
     l2_r_G = [p.r for p in l2_pose_G]
 
@@ -192,6 +199,12 @@ if __name__ == "__main__":
 
     l2_v_y = [v[1] for v in l2_v_G]
     l2_v_z = [v[2] for v in l2_v_G]
+
+    l1_a_y = [v[1] for v in l1_a_G]
+    l1_a_z = [v[2] for v in l1_a_G]
+
+    l2_a_y = [v[1] for v in l2_a_G]
+    l2_a_z = [v[2] for v in l2_a_G]
 
     # fig, ax = plt.subplots()
     # # scat = ax.scatter(l1_r_y[0], l1_r_z[0])
@@ -220,5 +233,13 @@ if __name__ == "__main__":
     plt.plot(time_array, l1_v_z)
     plt.plot(time_array, l2_v_y)
     plt.plot(time_array, l2_v_z)
+    plt.grid()
+    plt.show()
+
+    fig = plt.figure(figsize=(10, 10))
+    plt.plot(time_array, l1_a_y)
+    plt.plot(time_array, l1_a_z)
+    plt.plot(time_array, l2_a_y)
+    plt.plot(time_array, l2_a_z)
     plt.grid()
     plt.show()
