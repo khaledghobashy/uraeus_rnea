@@ -44,21 +44,29 @@ def evaluate_successor_kinematics(
     # jax.debug.print("v_B = {x}", x=v_B)
     # jax.debug.print("\n")
 
-    # a_B = (
-    #     (joint_kin.X_SP @ predecessor_kin.a_B)
-    #     + joint_kin.a_J
-    #     + cross(v_B, joint_kin.v_J)
-    # )
+    a_B = (
+        transform_screw(joint_kin.p_PS, predecessor_kin.a_B)
+        + joint_kin.a_J
+        + spatial_cross(v_B, joint_kin.v_J)
+    )
 
-    # v_GB = spatial_motion_rotation(R_GB) @ v_B
-    # v_s0 = translational_spatial_vector(v_B)
-    # a_GB = spatial_motion_rotation(R_GB) @ (a_B - cross(v_s0, v_B))
-
-    # v_GB = v_B = np.zeros((6,))
-    a_GB = a_B = np.zeros((6,))
+    v_s0 = translational_spatial_vector(v_B)
+    a_GB = express_screw(p_BG, (a_B - spatial_cross(v_s0, v_B)))
 
     successor_kin = BodyKinematics(p_GB, p_BG, v_B, a_B, v_GB, a_GB)
     return successor_kin
+
+
+@jax.jit
+def spatial_cross(v1: np.ndarray, v2: np.ndarray) -> np.ndarray:
+
+    v1_v, v1_w = jnp.split(v1, 2)
+    v2_v, v2_w = jnp.split(v2, 2)
+
+    v3_v = (skew_M @ v1_v @ v2_w) + (skew_M @ v1_w @ v2_v)
+    v3_w = (skew_M @ v1_w) @ v2_w
+
+    return -jnp.array([*v3_v, *v3_w])
 
 
 # @jax.jit
@@ -118,8 +126,8 @@ def extract_force_components(
 # @jax.jit
 def translational_spatial_vector(v: np.ndarray) -> np.ndarray:
     rotational_part = np.zeros((3,))
-    _, translational_part = v.reshape(2, -1)
-    return jnp.hstack([rotational_part, translational_part])
+    translational_part, _ = v.reshape(2, -1)
+    return jnp.hstack([translational_part, rotational_part])
 
 
 # =============================================================================

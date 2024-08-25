@@ -66,7 +66,7 @@ class DoublePendulumTest(unittest.TestCase):
         self.l1 = 5
         self.l2 = 5
 
-        self.theta1_dt0_f = lambda t: t
+        self.theta1_dt0_f = lambda t: 2 * jnp.sin(t)
         self.theta2_dt0_f = lambda t: t
 
         self.theta1_dt1_f = jax.jacfwd(self.theta1_dt0_f)
@@ -83,11 +83,12 @@ class DoublePendulumTest(unittest.TestCase):
             *[self._evaluate_forward_kinematics(t) for t in time_array]
         )
 
-        test_pose_G, test_vel_G, test_a_G = zip(*test_sol)
-        true_pose_G, true_vel_G, true_a_G = zip(*true_sol)
+        test_pose_G, test_vel_G, test_acc_G = zip(*test_sol)
+        true_pose_G, true_vel_G, true_acc_G = zip(*true_sol)
 
         np.testing.assert_almost_equal(true_pose_G, test_pose_G)
         np.testing.assert_almost_equal(true_vel_G, test_vel_G)
+        np.testing.assert_almost_equal(true_acc_G, test_acc_G)
 
     def _evaluate_forward_kinematics(self, t):
         test_sol = self._evaluate_multibody_forward_kinematics(t)
