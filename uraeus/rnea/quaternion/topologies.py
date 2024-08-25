@@ -1,8 +1,13 @@
 from functools import reduce
 from typing import Dict, List, NamedTuple, Tuple
 
-from uraeus.rnea.quaternion.bodies import RigidBody, RigidBodyData
+import numpy as np
+
+from uraeus.rnea.quaternion.bodies import RigidBody, RigidBodyData, BodyKinematics
+from uraeus.rnea.quaternion.tree_traversals import base_to_tip
 from uraeus.rnea.quaternion.graphs import Graph, Tree, contstruct_traversal_orders
+
+# from uraeus.rnea.quaternion.algorithms import split_coordinates
 from uraeus.rnea.quaternion.joints import (
     AbstractJoint,
     FunctionalJoint,
@@ -11,9 +16,8 @@ from uraeus.rnea.quaternion.joints import (
     construct_functional_joint,
     construct_joint_instance,
     initialize_joint,
+    JointKinematics,
 )
-
-import numpy as np
 
 
 class MultiBodyGraph(object):

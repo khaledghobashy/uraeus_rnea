@@ -192,9 +192,9 @@ def evaluate_joint_kinematics(
     # print("")
 
     v_J = transform_screw(p_SM.inv(), v_J)
-    jax.debug.print("mobilizer.v_J = {x}", x=mobilizer_kinematics.v_J)
-    jax.debug.print("transform_screw(p_SM.inv(), v_J) = {x}", x=v_J)
-    jax.debug.print("\n")
+    # jax.debug.print("mobilizer.v_J = {x}", x=mobilizer_kinematics.v_J)
+    # jax.debug.print("transform_screw(p_SM.inv(), v_J) = {x}", x=v_J)
+    # jax.debug.print("\n")
     # v_J = X_SM @ v_J
 
     # a_J = X_SM @ a_J
