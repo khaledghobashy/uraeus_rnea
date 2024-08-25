@@ -51,6 +51,37 @@ def analytic_system(l1, l2, theta1_func, theta2_func, t):
     return sys_kinematics
 
 
+def inverse_dynamics(l1, l2, m1, m2, theta1_func, theta2_func, t):
+
+    g = 9.81
+
+    sys_kinematics = analytic_system(l1, l2, theta1_func, theta2_func, t)
+    l1_kin, l2_kin = zip(*sys_kinematics)
+    l1_pose_G, l1_vel_G, l1_acc_G = l1_kin
+    l2_pose_G, l2_vel_G, l2_acc_G = l2_kin
+    # l1_acc_G, l2_acc_G = zip(*acc_G)
+
+    # f2_z = (m2 * l2_acc_G[1]) - (m2 * g)
+    f2_z = (m2 * g) - (m2 * l2_acc_G[1])
+    f2_y = m2 * l2_acc_G[0]
+    torque2 = (
+        f2_z * np.sin(theta1_func(t) + theta2_func(t))
+        + f2_y * np.cos(theta1_func(t) + theta2_func(t))
+    ) * l1
+    print("torque2 = ", torque2)
+
+    f1_z = (m1 * g) + f2_z - (m1 * l1_acc_G[1])
+    f1_y = -f2_y - (m1 * l1_acc_G[0])
+    torque1 = (
+        f1_z * np.sin(theta1_func(t)) + f1_y * np.cos(theta1_func(t))
+    ) * l2 + torque2
+    print("torque1 = ", torque1)
+
+    # print("f0_z = ", f0_z)
+
+    return (f1_y, f1_z), (f2_y, f2_z)
+
+
 if __name__ == "__main__":
     import numpy as np
     import matplotlib.pyplot as plt
@@ -58,55 +89,72 @@ if __name__ == "__main__":
 
     from uraeus.rnea.quaternion.utils import PlotData, plot_animated
 
-    theta1_dt0 = lambda t: 0
-    theta2_dt0 = lambda t: 2 * t
+    theta1_dt0 = lambda t: np.radians(0)
+    theta2_dt0 = lambda t: np.radians(90)
 
     time_array = np.linspace(0, 2 * np.pi, 100)
 
-    analytical_system = lambda t: analytic_system(5, 5, theta1_dt0, theta2_dt0, t)
-
-    analytic_kinematics = [analytical_system(t) for t in time_array]
-    sys_pose_G, sys_vel_G, sys_a_G = zip(*analytic_kinematics)
-
-    l1_pose_G, l2_pose_G = zip(*sys_pose_G)
-    l1_pose_G_y, l1_pose_G_z = zip(*l1_pose_G)
-    l2_pose_G_y, l2_pose_G_z = zip(*l2_pose_G)
-
-    l1_vel_G, l2_vel_G = zip(*sys_vel_G)
-    l1_vel_G_y, l1_vel_G_z = zip(*l1_vel_G)
-    l2_vel_G_y, l2_vel_G_z = zip(*l2_vel_G)
-
-    l1_acc_G, l2_acc_G = zip(*sys_a_G)
-    l1_acc_G_y, l1_acc_G_z = zip(*l1_acc_G)
-    l2_acc_G_y, l2_acc_G_z = zip(*l2_acc_G)
-
-    sys_pose_y = list(zip(np.zeros(len(time_array)), l1_pose_G_y, l2_pose_G_y))
-    sys_pose_z = list(zip(np.zeros(len(time_array)), l1_pose_G_z, l2_pose_G_z))
-
-    plot1 = PlotData(
-        title="System Animation",
-        x_axis=sys_pose_y,
-        y_axes=[sys_pose_z],
-        x_label="y",
-        y_label=["z"],
-        x_limit=(-10, 10),
-        y_limit=(-10, 10),
-        animated=True,
-        show_accumulated=False,
+    inverse_dynamics_func = lambda t: inverse_dynamics(
+        5, 5, 1, 1, theta1_dt0, theta2_dt0, t
     )
+    reactions = [inverse_dynamics_func(t) for t in time_array]
+    j1F, j2F = zip(*reactions)
+    j1F_y, j1F_z = zip(*j1F)
+    j2F_y, j2F_z = zip(*j2F)
 
-    plot2 = PlotData(
-        title="System Velocities",
-        x_axis=time_array,
-        y_axes=[l1_vel_G_y, l1_vel_G_z, l2_vel_G_y, l2_vel_G_z],
-        x_label="time",
-        y_label=["l1.y", "l1.z", "l2.y", "l2.z"],
-        x_limit=(0, max(time_array)),
-        y_limit=(min(l2_vel_G_y), max(l2_vel_G_y)),
-        animated=True,
-        show_accumulated=True,
-    )
-
-    fig, animator = plot_animated((2, 1), [plot1, plot2])
-    ani = animation.FuncAnimation(fig, animator, frames=99, interval=50)
+    plt.figure(figsize=(10, 10))
+    plt.plot(time_array, j1F_y, label="j1.y")
+    plt.plot(time_array, j1F_z, label="j1.z")
+    plt.plot(time_array, j2F_y, label="j2.y")
+    plt.plot(time_array, j2F_z, label="j2.z")
+    plt.grid()
+    plt.legend()
     plt.show()
+
+    # analytical_system = lambda t: analytic_system(5, 5, theta1_dt0, theta2_dt0, t)
+
+    # analytic_kinematics = [analytical_system(t) for t in time_array]
+    # sys_pose_G, sys_vel_G, sys_a_G = zip(*analytic_kinematics)
+
+    # l1_pose_G, l2_pose_G = zip(*sys_pose_G)
+    # l1_pose_G_y, l1_pose_G_z = zip(*l1_pose_G)
+    # l2_pose_G_y, l2_pose_G_z = zip(*l2_pose_G)
+
+    # l1_vel_G, l2_vel_G = zip(*sys_vel_G)
+    # l1_vel_G_y, l1_vel_G_z = zip(*l1_vel_G)
+    # l2_vel_G_y, l2_vel_G_z = zip(*l2_vel_G)
+
+    # l1_acc_G, l2_acc_G = zip(*sys_a_G)
+    # l1_acc_G_y, l1_acc_G_z = zip(*l1_acc_G)
+    # l2_acc_G_y, l2_acc_G_z = zip(*l2_acc_G)
+
+    # sys_pose_y = list(zip(np.zeros(len(time_array)), l1_pose_G_y, l2_pose_G_y))
+    # sys_pose_z = list(zip(np.zeros(len(time_array)), l1_pose_G_z, l2_pose_G_z))
+
+    # plot1 = PlotData(
+    #     title="System Animation",
+    #     x_axis=sys_pose_y,
+    #     y_axes=[sys_pose_z],
+    #     x_label="y",
+    #     y_label=["z"],
+    #     x_limit=(-10, 10),
+    #     y_limit=(-10, 10),
+    #     animated=True,
+    #     show_accumulated=False,
+    # )
+
+    # plot2 = PlotData(
+    #     title="System Velocities",
+    #     x_axis=time_array,
+    #     y_axes=[l1_vel_G_y, l1_vel_G_z, l2_vel_G_y, l2_vel_G_z],
+    #     x_label="time",
+    #     y_label=["l1.y", "l1.z", "l2.y", "l2.z"],
+    #     x_limit=(0, max(time_array)),
+    #     y_limit=(min(l2_vel_G_y), max(l2_vel_G_y)),
+    #     animated=True,
+    #     show_accumulated=True,
+    # )
+
+    # fig, animator = plot_animated((2, 1), [plot1, plot2])
+    # ani = animation.FuncAnimation(fig, animator, frames=99, interval=50)
+    # plt.show()
