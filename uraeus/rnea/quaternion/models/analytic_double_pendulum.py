@@ -1,11 +1,9 @@
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 
 def analytic_system(l1, l2, theta1_func, theta2_func, t):
-
-    # l1 = -5
-    # l2 = -5
 
     l1_z_func = lambda t: jnp.cos(-theta1_func(t)) * -l1
     l1_y_func = lambda t: jnp.sin(-theta1_func(t)) * -l1
@@ -63,23 +61,89 @@ def inverse_dynamics(l1, l2, m1, m2, theta1_func, theta2_func, t):
 
     # f2_z = (m2 * l2_acc_G[1]) - (m2 * g)
     f2_z = (m2 * g) - (m2 * l2_acc_G[1])
-    f2_y = m2 * l2_acc_G[0]
+    f2_y = -m2 * l2_acc_G[0]
     torque2 = (
-        f2_z * np.sin(theta1_func(t) + theta2_func(t))
-        + f2_y * np.cos(theta1_func(t) + theta2_func(t))
-    ) * l1
-    print("torque2 = ", torque2)
+        f2_z * -np.sin(-theta1_func(t) + -theta2_func(t))
+        + f2_y * np.cos(-theta1_func(t) + -theta2_func(t))
+    ) * l2
+    # print("torque2 = ", torque2)
 
     f1_z = (m1 * g) + f2_z - (m1 * l1_acc_G[1])
-    f1_y = -f2_y - (m1 * l1_acc_G[0])
+    f1_y = f2_y - (m1 * l1_acc_G[0])
     torque1 = (
-        f1_z * np.sin(theta1_func(t)) + f1_y * np.cos(theta1_func(t))
-    ) * l2 + torque2
-    print("torque1 = ", torque1)
+        f1_z * -np.sin(-theta1_func(t)) + f1_y * np.cos(-theta1_func(t))
+    ) * l1 + torque2
+    # print("torque1 = ", torque1)
 
     # print("f0_z = ", f0_z)
 
-    return (f1_y, f1_z), (f2_y, f2_z)
+    return (f1_y, f1_z, torque1), (f2_y, f2_z, torque2)
+
+
+class AnalyticDoublePendulum(object):
+
+    def __init__(self, l1, l2, m1, m2):
+        self.l1 = l1
+        self.l2 = l2
+        self.m1 = m1
+        self.m2 = m2
+
+    def evaluate_kinematics(self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray):
+
+        theta1_dt0, theta2_dt0 = qdt0
+        theta1_dt1, theta2_dt1 = qdt1
+        theta1_dt2, theta2_dt2 = qdt2
+
+        c1 = np.cos(theta1_dt0)
+        s1 = np.sin(theta1_dt0)
+        c2 = np.cos(theta1_dt0 + theta2_dt0)
+        s2 = np.sin(theta1_dt0 + theta2_dt0)
+
+        d1 = np.array([s1, -c1])
+        n1 = np.array([c1, s1])
+        d2 = np.array([s2, -c2])
+        n2 = np.array([c2, s2])
+
+        r1dt0 = self.l1 * d1
+        r2dt0 = r1dt0 + (self.l2 * d2)
+
+        r1dt1 = self.l1 * theta1_dt1 * n1
+        r2dt1 = (self.l2 * (theta1_dt1 + theta2_dt1) * n2) + r1dt1
+
+        r1dt2 = (self.l1 * theta1_dt2 * n1) + (theta1_dt1**2 * self.l1 * -d1)
+        r2dt2 = (
+            (self.l2 * (theta1_dt2 + theta2_dt2) * n2)
+            + ((theta1_dt1 + theta2_dt1) ** 2 * self.l2 * -d2)
+            + r1dt2
+        )
+
+        kinematics = ((r1dt0, r2dt0), (r1dt1, r2dt1), (r1dt2, r2dt2))
+
+        return kinematics
+
+    def evaluate_inverse_dynamics(
+        self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
+    ):
+
+        (r1dt0, r2dt0), _, (r1dt2, r2dt2) = self.evaluate_kinematics(qdt0, qdt1, qdt2)
+
+        g = 9.81
+        # FBD for l2 -> reactions at joint 2
+        F2g = np.array([0, -self.m2 * g])
+        F2i = self.m2 * r2dt2
+        Fj2 = -F2g - F2i
+
+        Tj2 = -(np.cross((r2dt0 - r1dt0), F2g)) - (np.cross((r2dt0 - r1dt0), F2i))
+
+        # FBD for l1 -> reactions at joint 1
+        F1g = np.array([0, -self.m1 * g])
+        F1i = self.m1 * r1dt2
+
+        Fj1 = Fj2 - F1g - F1i
+        Tj1 = Tj2 - np.cross(r1dt0, F1g) - np.cross(r1dt0, F1i) - np.cross(r1dt0, -Fj2)
+
+        forces = (np.array([*Fj1, Tj1]), np.array([*Fj2, Tj2]))
+        return forces
 
 
 if __name__ == "__main__":
@@ -89,8 +153,8 @@ if __name__ == "__main__":
 
     from uraeus.rnea.quaternion.utils import PlotData, plot_animated
 
-    theta1_dt0 = lambda t: np.radians(0)
-    theta2_dt0 = lambda t: np.radians(90)
+    theta1_dt0 = lambda t: np.radians(45)
+    theta2_dt0 = lambda t: np.radians(0)
 
     time_array = np.linspace(0, 2 * np.pi, 100)
 
@@ -99,8 +163,8 @@ if __name__ == "__main__":
     )
     reactions = [inverse_dynamics_func(t) for t in time_array]
     j1F, j2F = zip(*reactions)
-    j1F_y, j1F_z = zip(*j1F)
-    j2F_y, j2F_z = zip(*j2F)
+    j1F_y, j1F_z, j1F_tau = zip(*j1F)
+    j2F_y, j2F_z, j2F_tau = zip(*j2F)
 
     plt.figure(figsize=(10, 10))
     plt.plot(time_array, j1F_y, label="j1.y")
@@ -109,8 +173,13 @@ if __name__ == "__main__":
     plt.plot(time_array, j2F_z, label="j2.z")
     plt.grid()
     plt.legend()
-    plt.show()
 
+    plt.figure(figsize=(10, 10))
+    plt.plot(time_array, j1F_tau, label="j1.tau")
+    plt.plot(time_array, j2F_tau, label="j2.tau")
+    plt.grid()
+    plt.legend()
+    plt.show()
     # analytical_system = lambda t: analytic_system(5, 5, theta1_dt0, theta2_dt0, t)
 
     # analytic_kinematics = [analytical_system(t) for t in time_array]
