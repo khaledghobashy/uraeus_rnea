@@ -67,7 +67,19 @@ def force_spatial_cross(v1: np.ndarray, v2: np.ndarray) -> np.ndarray:
     v3_v = skew_M @ v1_w @ v2_v
     v3_w = (skew_M @ v1_w @ v2_w) + (skew_M @ v1_v @ v2_v)
 
-    return -jnp.array([*v3_v, *v3_w])
+    return jnp.array([*v3_v, *v3_w])
+
+
+@jax.jit
+def screw_cross(v1: np.ndarray, v2: np.ndarray) -> np.ndarray:
+
+    v1_v, v1_w = jnp.split(v1, 2)
+    v2_v, v2_w = jnp.split(v2, 2)
+
+    v3_v = skew_M @ v1_v @ v2_v
+    v3_w = (skew_M @ v1_v @ v2_w) + (skew_M @ v1_w @ v2_v)
+
+    return jnp.array([*v3_v, *v3_w])
 
 
 # @jax.jit
@@ -76,14 +88,25 @@ def evaluate_joint_inertia_force(
     successor_I: np.ndarray,
     external_forces: List[np.ndarray],
 ) -> np.ndarray:
-    fb_S = (successor_I @ successor_kin.a_B) + force_spatial_cross(
-        successor_kin.v_B, (successor_I @ successor_kin.v_B)
-    )
+
+    # inertia forces from direct accelerations
+    fi_S_qdt2 = successor_I @ express_screw(successor_kin.p_GB, successor_kin.a_G)
+
+    # inertia forces from rotational velocity
+    fi_S_qdt1 = screw_cross(successor_kin.v_B, (successor_I @ successor_kin.v_B))
+
+    # Total inertia forces
+    fi_S = fi_S_qdt2 + fi_S_qdt1
+
     fe_S = express_screw(successor_kin.p_GB, sum(external_forces, np.zeros((6,))))
+    fb_S = -(fi_S + fe_S)
 
-    f = fb_S - fe_S
+    # print("(successor_I @ successor_kin.a_B) = ", (successor_I @ successor_kin.a_B))
+    # print("fe_S = ", fe_S)
+    # print("fb_S = ", fb_S)
+    # print("")
 
-    return f
+    return fb_S
 
 
 # @jax.jit
@@ -95,6 +118,10 @@ def construct_mobilizer_force(
 ) -> MobilizerForces:
     fc_S, fa_S, tau = extract_force_components(fi_S, joint_frames, joint_kin)
     fc_G = express_screw(successor_kin.p_BG, fc_S)
+    # print("tau = ", tau)
+    # print("fc_G = ", fc_G)
+    # print("fc_S = ", fc_S)
+    # print("")
 
     return MobilizerForces(fi_S, fc_S, fa_S, fc_G, tau)
 

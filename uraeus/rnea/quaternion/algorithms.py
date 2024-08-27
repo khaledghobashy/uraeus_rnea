@@ -230,7 +230,7 @@ class HybridDynamics(object):
 
 
 def _helper(predecessor_p_GB: SpatialPose, joint: JointKinematics):
-    print(f"joint_kin.p_PS = {joint.p_PS}")
+    # print(f"joint_kin.p_PS = {joint.p_PS}")
 
     p_GB = predecessor_p_GB @ joint.p_PS
     p_BG = p_GB.inv()

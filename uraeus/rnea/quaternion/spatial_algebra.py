@@ -277,11 +277,11 @@ def transform_screw(pose: SpatialPose, screw: np.ndarray) -> np.ndarray:
 
 @jax.jit
 def transform_screw_force(pose: SpatialPose, screw: np.ndarray) -> np.ndarray:
-    v, w = jnp.split(screw, 2)
-    new_w = transform_vector(pose.q, w) + transform_vector(
-        pose.q, ((skew_M @ pose.r) @ v)
+    force, torque = jnp.split(screw, 2)
+    new_w = transform_vector(pose.q, torque) + transform_vector(
+        pose.q, ((skew_M @ pose.r) @ force)
     )
-    new_v = transform_vector(pose.q, v)
+    new_v = transform_vector(pose.q, force)
 
     new_screw = jnp.array([*new_v, *new_w])
     return new_screw

@@ -21,7 +21,7 @@ from uraeus.rnea.quaternion.algorithms_operations import (
     evaluate_joint_inertia_force,
     evaluate_successor_kinematics,
 )
-from uraeus.rnea.quaternion.spatial_algebra import transform_screw_force
+from uraeus.rnea.quaternion.spatial_algebra import transform_screw_force, express_screw
 from uraeus.rnea.quaternion.graphs import (
     accumulate_leaf_to_root,
     accumulate_root_to_leaf,
@@ -114,10 +114,12 @@ def evaluate_tau(
     fi_Ms = list(map(transform_screw_force, forces_transforms_p_SM, joints_forces))
     taus = map(jnp.dot, [j.S_FM.T for j in joints_kinematics], fi_Ms)
     tau = jnp.hstack(list(taus))
-    print(joints_forces)
-    print(fi_Ms)
-    print(tau)
-    print("")
+    # print(joints_forces)
+    # print("joints_forces = ", joints_forces)
+    # print("tau = ", tau)
+    # print("fi_Ms = ", fi_Ms)
+    # print(tau)
+    # print("")
 
     return tau
 
