@@ -14,8 +14,8 @@ from uraeus.rnea.quaternion.joints import (
 )
 from uraeus.rnea.quaternion.spatial_algebra import (
     SpatialPose,
-    skew_M,
-    quaternion_to_dcm,
+    express_screw,
+    transform_screw,
 )
 from uraeus.rnea.quaternion.topologies import HybridDynamicsData, MultiBodyData
 from uraeus.rnea.quaternion.graphs import accumulate_root_to_leaf
@@ -107,7 +107,7 @@ def forward_dynamics_call(
     H = JointInertiaMatrixOperations.construct_H(tree_data, joints_kin, qdt0)
 
     rhs = tau - C
-    qdt2 = jnp.linalg.solve(H, rhs)
+    qdt2 = jnp.linalg.solve(H, -rhs)
     return qdt2
 
 
@@ -115,7 +115,7 @@ def forward_dynamics_call(
 def eval_successor_acc(
     predecessor_acc: np.ndarray, joint_kin: JointKinematics
 ) -> np.ndarray:
-    a_B = (joint_kin.p_SP @ predecessor_acc) + joint_kin.a_J
+    a_B = transform_screw(joint_kin.p_PS, predecessor_acc) + joint_kin.a_J
     return a_B
 
 
@@ -154,7 +154,10 @@ class JointInertiaMatrixOperations(NamedTuple):
             tree_data.qdt0_idx, qdt0, jnp.zeros_like(qdt0), qdt2
         )
         a_J_mob = [j.mobilizer.a_J(*qs) for j, qs in zip(tree_data.joints, coordinates)]
-        a_J_jnt = [j.frames.p_SM @ a_J for j, a_J in zip(tree_data.joints, a_J_mob)]
+        a_J_jnt = [
+            transform_screw(j.frames.p_SM.inv(), a_J)
+            for j, a_J in zip(tree_data.joints, a_J_mob)
+        ]
         new_kin = [
             JointKinematics(*kin[:-1], a_J) for kin, a_J in zip(joints_kin, a_J_jnt)
         ]
@@ -169,10 +172,7 @@ class JointInertiaMatrixOperations(NamedTuple):
         forward_traversal = tree_data.forward_traversal
         backward_traversal = tree_data.backward_traversal
         joints_frames = tuple(j.frames for j in tree_data.joints)
-        motion_to_force_transform = lambda i: i  # place holder
-        forces_transforms = tuple(
-            motion_to_force_transform(j.p_PS) for j in reversed(joints_kin)
-        )
+        forces_transforms = tuple(j.p_SP for j in reversed(joints_kin))
 
         bodies_acc = node_acceleration_accumulator(forward_traversal, joints_kin)
         bodies_forces = tuple(map(jnp.dot, tree_data.bodies_inertias, bodies_acc))
