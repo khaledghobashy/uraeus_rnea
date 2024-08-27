@@ -27,8 +27,6 @@ from uraeus.rnea.quaternion.algorithms import (
     forward_dynamics_call,
 )
 from uraeus.rnea.quaternion.models.analytic_double_pendulum import (
-    analytic_system,
-    inverse_dynamics,
     AnalyticDoublePendulum,
 )
 from uraeus.rnea.quaternion.tree_traversals import extract_mobilizer_forces
