@@ -24,6 +24,7 @@ from uraeus.rnea.quaternion.algorithms import (
     split_coordinates,
     IDCallRes,
     inverse_dynamics_call,
+    forward_dynamics_call,
 )
 from uraeus.rnea.quaternion.models.analytic_double_pendulum import (
     analytic_system,
@@ -74,6 +75,15 @@ class Model(object):
         res = inverse_dynamics_call(self.tree_data, forces, qdt0, qdt1, qdt2)
         return res
 
+    def forward_dynamics_pass(
+        self, qdt0: np.ndarray, qdt1: np.ndarray, tau: np.ndarray
+    ):
+        forces = [
+            list(forces_dict.values()) for name, forces_dict in self.forces_map.items()
+        ]
+        qdt2 = forward_dynamics_call(self.tree_data, forces, qdt0, qdt1, tau)
+        return qdt2
+
 
 class DoublePendulumTest(unittest.TestCase):
 
@@ -92,11 +102,11 @@ class DoublePendulumTest(unittest.TestCase):
         # self.theta1_dt0_f = lambda t: np.radians(45)
         # self.theta2_dt0_f = lambda t: np.radians(-90)
 
-        self.theta1_dt0_f = lambda t: t
-        self.theta2_dt0_f = lambda t: t
+        # self.theta1_dt0_f = lambda t: t
+        # self.theta2_dt0_f = lambda t: t
 
-        # self.theta1_dt0_f = lambda t: 2 * jnp.sin(t)
-        # self.theta2_dt0_f = lambda t: 1.5 * jnp.sin(2 * t)
+        self.theta1_dt0_f = lambda t: 2 * jnp.sin(t)
+        self.theta2_dt0_f = lambda t: 1.5 * jnp.sin(2 * t)
 
         self.theta1_dt1_f = jax.jacfwd(self.theta1_dt0_f)
         self.theta2_dt1_f = jax.jacfwd(self.theta2_dt0_f)
@@ -125,7 +135,7 @@ class DoublePendulumTest(unittest.TestCase):
         np.testing.assert_almost_equal(true_vel_G, test_vel_G)
         np.testing.assert_almost_equal(true_acc_G, test_acc_G)
 
-    # @unittest.skip
+    @unittest.skip
     def test_inverse_dynamics(self):
         time_array = np.linspace(0, 2 * np.pi, 100)
 
@@ -136,6 +146,30 @@ class DoublePendulumTest(unittest.TestCase):
         # test_sol, true_sol = self._evaluate_inverse_dynamics(time_array[29])
 
         np.testing.assert_almost_equal(true_sol, test_sol)
+
+    def test_forward_dynamics(self):
+        time_array = np.linspace(0, 2 * np.pi, 100)
+
+        true_sol, test_sol = zip(
+            *[self._evaluate_forward_dynamics(t) for t in time_array]
+        )
+        np.testing.assert_almost_equal(true_sol, test_sol)
+
+    def _evaluate_forward_dynamics(self, t):
+
+        qdt0 = np.array([self.theta1_dt0_f(t), self.theta2_dt0_f(t)])
+        qdt1 = np.array([self.theta1_dt1_f(t), self.theta2_dt1_f(t)])
+        qdt2 = np.array([self.theta1_dt2_f(t), self.theta2_dt2_f(t)])
+
+        res: IDCallRes = self.multibody_system.inverse_dynamics_pass(qdt0, qdt1, qdt2)
+        tau = res.tau
+
+        qdt2_test = self.multibody_system.forward_dynamics_pass(qdt0, qdt1, tau)
+
+        print("true_sol = ", qdt2)
+        print("test_sol = ", qdt2_test)
+        print("")
+        return qdt2, qdt2_test
 
     def _evaluate_forward_kinematics(self, t):
         test_sol = self._evaluate_multibody_forward_kinematics(t)
