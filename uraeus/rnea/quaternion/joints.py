@@ -92,7 +92,7 @@ class JointInstance(NamedTuple):
     joint_data: JointData
     joint_type: AbstractJoint
 
-    @partial(jax.jit, static_argnums=(0,))
+    # @partial(jax.jit, static_argnums=(0,))
     def evaluate_kinematics(
         self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
     ) -> MobilizerKinematics:
@@ -122,14 +122,14 @@ TranslationalJoint = AbstractJoint(
 PlanarJoint = AbstractJoint(
     nj=3,
     mobilizer=PlanarMobilizer(),
-    coordinates_names=["psi", "x", "y"],
+    coordinates_names=["x", "y", "psi"],
 )
 
 
 FreeJoint = AbstractJoint(
     nj=6,
     mobilizer=FreeMobilizer(),
-    coordinates_names=["phi", "theta", "psi", "x", "y", "z"],
+    coordinates_names=["x", "y", "z", "phi", "theta", "psi"],
 )
 
 
@@ -182,6 +182,8 @@ def evaluate_joint_kinematics(
 
     p_FM, S_FM, v_J, a_J = mobilizer_kinematics
 
+    # print("p_FM = ", p_FM)
+
     p_PS = p_SM.inv() @ p_FM @ p_PF
     p_SP = p_PS.inv()
 
@@ -227,8 +229,11 @@ def initialize_joint(
 
     z_axis_G = np.array([0, 0, 1])
     rot_axis = np.cross(z_axis_G, z_axis)
-    angle = np.arccos(z_axis_G @ z_axis)
-    q_JG = quaternion_from_axis_angle(-angle, rot_axis)
+    if np.linalg.norm(rot_axis) != 0:
+        angle = np.arccos(z_axis_G @ z_axis)
+        q_JG = quaternion_from_axis_angle(-angle, rot_axis)
+    else:
+        q_JG = np.array([1, 0, 0, 0])
 
     print("Initializing Joint:")
     print(f"Joint frame in global = \n", quaternion_to_dcm(q_JG))
