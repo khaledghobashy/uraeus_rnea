@@ -84,12 +84,12 @@ class RevolutePolynomials(AbstractMotionEquations):
     @staticmethod
     def pose_polynomials(qd0: np.ndarray):
         psi = qd0[0]
-        pose_states = jnp.array([0, 0, psi, 0, 0, 0])
+        pose_states = jnp.array([0, 0, 0, 0, 0, psi])
         return pose_states
 
     @staticmethod
     def pose_jacobian_dt0(qdt0: np.ndarray):
-        pose_states_jacobian = np.array([0, 0, 1, 0, 0, 0])[:, None]
+        pose_states_jacobian = np.array([0, 0, 0, 0, 0, 1])[:, None]
         return pose_states_jacobian
 
     @staticmethod
@@ -104,12 +104,12 @@ class TranslationalPolynomials(AbstractMotionEquations):
     @staticmethod
     def pose_polynomials(qd0: np.ndarray):
         z = qd0[0]
-        pose_states = jnp.array([0, 0, 0, 0, 0, z])
+        pose_states = jnp.array([0, 0, z, 0, 0, 0])
         return pose_states
 
     @staticmethod
     def pose_jacobian_dt0(qdt0: np.ndarray):
-        pose_states_jacobian = np.array([0, 0, 0, 0, 0, 1])[:, None]
+        pose_states_jacobian = np.array([0, 0, 1, 0, 0, 0])[:, None]
         return pose_states_jacobian
 
     @staticmethod
@@ -123,20 +123,20 @@ class PlanarPolynomials(AbstractMotionEquations):
 
     @staticmethod
     def pose_polynomials(qdt0: np.ndarray):
-        psi, x, y = qdt0
-        pose_states = jnp.array([0, 0, psi, x, y, 0])
+        x, y, psi = qdt0
+        pose_states = jnp.array([x, y, 0, 0, 0, psi])
         return pose_states
 
     @staticmethod
     def pose_jacobian_dt0(qdt0: np.ndarray):
         pose_states_jacobian = np.array(
             [
-                [0, 0, 0],
-                [0, 0, 0],
                 [1, 0, 0],
                 [0, 1, 0],
-                [0, 0, 1],
                 [0, 0, 0],
+                [0, 0, 0],
+                [0, 0, 0],
+                [0, 0, 1],
             ]
         )
         return pose_states_jacobian
@@ -152,8 +152,8 @@ class FreePolynomials(AbstractMotionEquations):
 
     @staticmethod
     def pose_polynomials(qdt0: np.ndarray):
-        phi, theta, psi, x, y, z = qdt0
-        pose_states = jnp.array([phi, theta, psi, x, y, z])
+        x, y, z, phi, theta, psi = qdt0
+        pose_states = jnp.array([x, y, z, phi, theta, psi])
         return pose_states
 
     @staticmethod
