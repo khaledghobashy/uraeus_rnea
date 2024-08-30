@@ -9,15 +9,14 @@ import jax.numpy as jnp
 import numpy as np
 
 from uraeus.rnea.quaternion.bodies import BodyKinematics
-from uraeus.rnea.quaternion.joints import (
-    JointKinematics,
-)
+from uraeus.rnea.quaternion.joints import JointKinematics, FunctionalJoint
 from uraeus.rnea.quaternion.spatial_algebra import (
     SpatialPose,
     express_screw,
     transform_screw,
+    transform_screw_force,
 )
-from uraeus.rnea.quaternion.topologies import HybridDynamicsData, MultiBodyData
+
 from uraeus.rnea.quaternion.graphs import accumulate_root_to_leaf
 from uraeus.rnea.quaternion.tree_traversals import (
     base_to_tip,
@@ -25,11 +24,6 @@ from uraeus.rnea.quaternion.tree_traversals import (
     evaluate_tau,
     joints_forces_accumulator,
 )
-
-
-# def split(arr: np.ndarray, idx: np.ndarray):
-#     res = [arr[i:j] for (i, j) in zip(idx[:-1], idx[1:])]
-#     return res
 
 
 # @partial(jax.jit, static_argnums=(0,))
@@ -40,6 +34,24 @@ def split_coordinates(
         (qdt0[i:j], qdt1[i:j], qdt2[i:j]) for (i, j) in zip(idx[:-1], idx[1:])
     )
     return coordinates
+
+
+class MultiBodyData(NamedTuple):
+    joints: Tuple[FunctionalJoint]
+    bodies_inertias: List[np.ndarray]
+    forward_traversal: Tuple[Tuple[int, int, int], ...]
+    backward_traversal: List[Tuple[int, List[int]]]
+    qdt0_idx: Tuple[int]
+    qdt1_idx: Tuple[int]
+
+    def __hash__(self):
+        return hash(self.__class__.__name__)
+
+
+class HybridDynamicsData(NamedTuple):
+    tree_data: MultiBodyData
+    permutation_matrix: np.ndarray
+    n_fd: int
 
 
 class IDCallRes(NamedTuple):
@@ -232,9 +244,9 @@ class HybridDynamics(object):
 def _helper(predecessor_p_GB: SpatialPose, joint: JointKinematics):
     # print(f"joint_kin.p_PS = {joint.p_PS}")
 
-    p_GB = predecessor_p_GB @ joint.p_PS
-    p_BG = p_GB.inv()
-    return p_BG
+    p_GB = joint.p_PS @ predecessor_p_GB
+    # p_BG = p_GB.inv()
+    return p_GB
 
 
 _bodies_config_func = accumulate_root_to_leaf(
@@ -248,15 +260,13 @@ def ext_forces_to_gen_forces(
     joints_kin: Tuple[JointKinematics, ...],
     ext_forces: Tuple[Tuple[np.ndarray, ...], ...],
 ):
-    bodies_E_BG = _bodies_config_func(tree_data.forward_traversal, joints_kin)
-    motion_to_force_transform = lambda i: i
-    bodies_E_BG_f = map(motion_to_force_transform, bodies_E_BG)
+    bodies_p_GB = _bodies_config_func(tree_data.forward_traversal, joints_kin)
     bodies_fe_S = map(
-        jnp.dot, bodies_E_BG_f, [sum(forces, np.zeros((6,))) for forces in ext_forces]
+        express_screw,
+        bodies_p_GB,
+        [sum(forces, np.zeros((6,))) for forces in ext_forces],
     )
-    forces_transforms = [
-        motion_to_force_transform(j.p_PS) for j in reversed(joints_kin)
-    ]
+    forces_transforms = [(j.p_SP) for j in reversed(joints_kin)]
     joints_forces = list(
         reversed(
             joints_forces_accumulator(

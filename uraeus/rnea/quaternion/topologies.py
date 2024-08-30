@@ -1,5 +1,5 @@
 from functools import reduce
-from typing import Dict, List, NamedTuple, Tuple
+from typing import Dict, List, NamedTuple, Tuple, Iterable
 
 import numpy as np
 
@@ -7,7 +7,6 @@ from uraeus.rnea.quaternion.bodies import RigidBody, RigidBodyData, BodyKinemati
 from uraeus.rnea.quaternion.tree_traversals import base_to_tip
 from uraeus.rnea.quaternion.graphs import Graph, Tree, contstruct_traversal_orders
 
-# from uraeus.rnea.quaternion.algorithms import split_coordinates
 from uraeus.rnea.quaternion.joints import (
     AbstractJoint,
     FunctionalJoint,
@@ -17,6 +16,15 @@ from uraeus.rnea.quaternion.joints import (
     construct_joint_instance,
     initialize_joint,
     JointKinematics,
+)
+
+from uraeus.rnea.quaternion.algorithms import (
+    split_coordinates,
+    MultiBodyData,
+    HybridDynamicsData,
+    IDCallRes,
+    inverse_dynamics_call,
+    forward_dynamics_call,
 )
 
 
@@ -133,24 +141,6 @@ class MultiBodyTree(object):
         return joint_name in self.joints
 
 
-class MultiBodyData(NamedTuple):
-    joints: Tuple[FunctionalJoint]
-    bodies_inertias: List[np.ndarray]
-    forward_traversal: Tuple[Tuple[int, int, int], ...]
-    backward_traversal: List[Tuple[int, List[int]]]
-    qdt0_idx: Tuple[int]
-    qdt1_idx: Tuple[int]
-
-    def __hash__(self):
-        return hash(self.__class__.__name__)
-
-
-class HybridDynamicsData(NamedTuple):
-    tree_data: MultiBodyData
-    permutation_matrix: np.ndarray
-    n_fd: int
-
-
 def construct_permutation_matrix(dof: int, id_indices: List[int]) -> np.ndarray:
     permutation = [i for i in range(dof) if i not in id_indices]
     permutation += id_indices
@@ -192,6 +182,57 @@ def construct_multibodydata(topology: MultiBodyTree) -> MultiBodyData:
     )
 
     return data
+
+
+class Model(object):
+    topology: MultiBodyTree
+    forces_map: Dict[str, Dict[str, np.ndarray]]
+    tree_data: MultiBodyData
+
+    def __init__(self, topology: MultiBodyTree):
+        self.topology = topology
+        gravity = np.array([0, 0, -9.81, 0, 0, 0])
+        self.forces_map = {
+            b.name: {"gravity": b.I @ gravity} for b in self.topology.bodies.values()
+        }
+
+        self.tree_data = construct_multibodydata(topology)
+        self.bodies_idx = {b: i for i, b in enumerate(self.topology.tree.nodes)}
+
+    def get_body_kinematics(
+        self, name: str, bodies_kinematics: List[BodyKinematics]
+    ) -> BodyKinematics:
+        return bodies_kinematics[self.bodies_idx[name]]
+
+    def forward_kinematics_pass(
+        self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
+    ) -> Tuple[BodyKinematics, JointKinematics]:
+        coordinates = split_coordinates(self.tree_data.qdt0_idx, qdt0, qdt1, qdt2)
+
+        bodies_kinematics, joints_kinematics = base_to_tip(
+            self.tree_data.joints, coordinates, self.tree_data.forward_traversal
+        )
+
+        return bodies_kinematics, joints_kinematics
+
+    def inverse_dynamics_pass(
+        self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
+    ) -> IDCallRes:
+        forces = [
+            list(forces_dict.values()) for name, forces_dict in self.forces_map.items()
+        ]
+        # print(forces)
+        res = inverse_dynamics_call(self.tree_data, forces, qdt0, qdt1, qdt2)
+        return res
+
+    def forward_dynamics_pass(
+        self, qdt0: np.ndarray, qdt1: np.ndarray, tau: np.ndarray
+    ):
+        forces = [
+            list(forces_dict.values()) for name, forces_dict in self.forces_map.items()
+        ]
+        qdt2 = forward_dynamics_call(self.tree_data, forces, qdt0, qdt1, tau)
+        return qdt2
 
 
 # =============================================================================

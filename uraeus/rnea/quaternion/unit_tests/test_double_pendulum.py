@@ -1,86 +1,17 @@
 import unittest
-import functools
-import itertools
-from typing import Callable, Any, List, Dict, Tuple
 
 import numpy as np
 import jax.numpy as jnp
 import jax
 
-
-from uraeus.rnea.quaternion.bodies import RigidBodyData, BodyKinematics
-from uraeus.rnea.quaternion.joints import (
-    JointConfigInputs,
-    RevoluteJoint,
-    JointKinematics,
-)
-from uraeus.rnea.quaternion.topologies import (
-    MultiBodyTree,
-    construct_multibodydata,
-    MultiBodyData,
-    base_to_tip,
-)
-from uraeus.rnea.quaternion.algorithms import (
-    split_coordinates,
-    IDCallRes,
-    inverse_dynamics_call,
-    forward_dynamics_call,
-)
+from uraeus.rnea.quaternion.bodies import RigidBodyData
+from uraeus.rnea.quaternion.joints import JointConfigInputs, RevoluteJoint
+from uraeus.rnea.quaternion.topologies import MultiBodyTree, Model
+from uraeus.rnea.quaternion.algorithms import IDCallRes
 from uraeus.rnea.quaternion.models.analytic_double_pendulum import (
     AnalyticDoublePendulum,
 )
 from uraeus.rnea.quaternion.tree_traversals import extract_mobilizer_forces
-
-
-class Model(object):
-    topology: MultiBodyTree
-    forces_map: Dict[str, Dict[str, np.ndarray]]
-    tree_data: MultiBodyData
-
-    def __init__(self, topology: MultiBodyTree):
-        self.topology = topology
-        gravity = np.array([0, 0, -9.81, 0, 0, 0])
-        self.forces_map = {
-            b.name: {"gravity": b.I @ gravity} for b in self.topology.bodies.values()
-        }
-
-        self.tree_data = construct_multibodydata(topology)
-        self.bodies_idx = {b: i for i, b in enumerate(self.topology.tree.nodes)}
-
-    def get_body_kinematics(
-        self, name: str, bodies_kinematics: List[BodyKinematics]
-    ) -> BodyKinematics:
-        return bodies_kinematics[self.bodies_idx[name]]
-
-    def forward_kinematics_pass(
-        self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
-    ) -> Tuple[BodyKinematics, JointKinematics]:
-        coordinates = split_coordinates(self.tree_data.qdt0_idx, qdt0, qdt1, qdt2)
-
-        bodies_kinematics, joints_kinematics = base_to_tip(
-            self.tree_data.joints, coordinates, self.tree_data.forward_traversal
-        )
-
-        return bodies_kinematics, joints_kinematics
-
-    def inverse_dynamics_pass(
-        self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
-    ) -> IDCallRes:
-        forces = [
-            list(forces_dict.values()) for name, forces_dict in self.forces_map.items()
-        ]
-        # print(forces)
-        res = inverse_dynamics_call(self.tree_data, forces, qdt0, qdt1, qdt2)
-        return res
-
-    def forward_dynamics_pass(
-        self, qdt0: np.ndarray, qdt1: np.ndarray, tau: np.ndarray
-    ):
-        forces = [
-            list(forces_dict.values()) for name, forces_dict in self.forces_map.items()
-        ]
-        qdt2 = forward_dynamics_call(self.tree_data, forces, qdt0, qdt1, tau)
-        return qdt2
 
 
 class DoublePendulumTest(unittest.TestCase):
@@ -118,7 +49,7 @@ class DoublePendulumTest(unittest.TestCase):
             self.l1, self.l2, self.m1, self.m2
         )
 
-    @unittest.skip
+    # @unittest.skip
     def test_forward_kinematics(self):
         time_array = np.linspace(0, 2 * np.pi, 100)
 
@@ -133,7 +64,7 @@ class DoublePendulumTest(unittest.TestCase):
         np.testing.assert_almost_equal(true_vel_G, test_vel_G)
         np.testing.assert_almost_equal(true_acc_G, test_acc_G)
 
-    @unittest.skip
+    # @unittest.skip
     def test_inverse_dynamics(self):
         time_array = np.linspace(0, 2 * np.pi, 100)
 
