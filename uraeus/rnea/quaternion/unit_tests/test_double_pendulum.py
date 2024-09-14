@@ -201,8 +201,8 @@ class DoublePendulumTest(unittest.TestCase):
         j2_fi_S, j2_fc_S, j2_fa_S, j2_fc_G, j2_tau = j2_forces
 
         forces = (
-            np.array([*j1_fc_G[1:3], j1_tau[0]]),
-            np.array([*j2_fc_G[1:3], j2_tau[0]]),
+            -np.array([*j1_fc_G[1:3], j1_tau[0]]),
+            -np.array([*j2_fc_G[1:3], j2_tau[0]]),
         )
 
         return forces

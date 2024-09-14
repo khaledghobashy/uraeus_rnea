@@ -43,9 +43,12 @@ def edge_force_func(
     transforms: List[np.ndarray],
     out_forces: List[np.ndarray],
 ):
-    return successor_force + sum(
+    out_forces_S = sum(
         map(transform_screw_force, transforms, out_forces), np.zeros((6,))
     )
+    # jax.debug.print("successor_force = {x}", x=successor_force)
+    # print(f"out_forces_S = {out_forces_S}")
+    return successor_force + out_forces_S
 
 
 root_to_leaf = accumulate_root_to_leaf(
@@ -96,6 +99,9 @@ def tip_to_base(
         )
     )
 
+    # print(f"bodies_forces = {bodies_forces}")
+    # print(f"joints_forces = {joints_forces}")
+
     return joints_forces
 
 
@@ -112,6 +118,7 @@ def evaluate_tau(
 
     forces_transforms_p_SM = [j.p_SM for j in joints_frames]
     fi_Ms = list(map(transform_screw_force, forces_transforms_p_SM, joints_forces))
+    # fi_Ms = list(map(express_screw, forces_transforms_p_SM, joints_forces))
     taus = map(jnp.dot, [j.S_FM.T for j in joints_kinematics], fi_Ms)
     tau = jnp.hstack(list(taus))
     # print(joints_forces)

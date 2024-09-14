@@ -267,9 +267,10 @@ class SpatialScrew(object):
 def transform_screw(pose: SpatialPose, screw: np.ndarray) -> np.ndarray:
     v, w = jnp.split(screw, 2)
     new_w = transform_vector(pose.q, w)
-    new_v = transform_vector(pose.q, v) + transform_vector(
-        pose.q, ((skew_M @ pose.r) @ w)
-    )
+    # new_v = transform_vector(pose.q, v) + transform_vector(
+    #     pose.q, ((skew_M @ pose.r) @ w)
+    # )
+    new_v = transform_vector(pose.q, v + (skew_M @ pose.r) @ w)
 
     new_screw = jnp.array([*new_v, *new_w])
     return new_screw
@@ -325,7 +326,7 @@ def euler_to_quaternion(roll, pitch, yaw):
     qy = cr * sp * cy + sr * cp * sy
     qz = cr * cp * sy - sr * sp * cy
 
-    return jnp.array([qw, qx, qy, qz])
+    return normalize(jnp.array([qw, qx, qy, qz]))
 
 
 def dcm_to_quaternion(dcm):
