@@ -54,16 +54,16 @@ class AnalyticDoublePendulum(object):
         # FBD for l2 -> reactions at joint 2
         F2g = np.array([0, -self.m2 * g])
         F2i = self.m2 * r2dt2
-        Fj2 = -F2g - F2i
+        Fj2 = F2g - F2i
 
-        Tj2 = -(np.cross((r2dt0 - r1dt0), F2g)) - (np.cross((r2dt0 - r1dt0), F2i))
+        Tj2 = (np.cross((r2dt0 - r1dt0), F2g)) - (np.cross((r2dt0 - r1dt0), F2i))
 
         # FBD for l1 -> reactions at joint 1
         F1g = np.array([0, -self.m1 * g])
         F1i = self.m1 * r1dt2
 
-        Fj1 = Fj2 - F1g - F1i
-        Tj1 = Tj2 - np.cross(r1dt0, F1g) - np.cross(r1dt0, F1i) + np.cross(r1dt0, Fj2)
+        Fj1 = Fj2 + F1g - F1i
+        Tj1 = Tj2 + np.cross(r1dt0, F1g) - np.cross(r1dt0, F1i) + np.cross(r1dt0, Fj2)
 
         forces = (np.array([*Fj1, Tj1]), np.array([*Fj2, Tj2]))
         return forces
