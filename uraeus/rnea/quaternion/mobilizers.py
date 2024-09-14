@@ -20,6 +20,8 @@ from uraeus.rnea.quaternion.spatial_algebra import (
     skew_M,
     quaternion_inverse,
     transform_vector,
+    normalize,
+    quaternion_multiply,
 )
 
 from uraeus.rnea.quaternion.motion_equations import (
@@ -78,15 +80,16 @@ class CustomMobilizer(AbstractMobilizer):
 
     @partial(jax.jit, static_argnums=(0,))
     def p_FM(self, qdt0: np.ndarray) -> SpatialPose:
-        print(self.__class__.__name__)
+        # print(self.__class__.__name__)
         pose_dt0 = self.polynomials.pose_polynomials(qdt0)
         # orientation, location = jnp.split(pose_dt0, 2)
         location, orientation = jnp.split(pose_dt0, 2)
         phi, theta, psi = orientation
         # R_FM = rot_z(psi) @ rot_y(theta) @ rot_x(phi)
         q = euler_to_quaternion(phi, theta, psi)
-        r = transform_vector(quaternion_inverse(q), -location)
-        p_FM = SpatialPose(r, q)
+        # r = transform_vector(quaternion_inverse(q), -location)
+        r = transform_vector(q, location)
+        p_FM = SpatialPose(r, quaternion_inverse(q))
         return p_FM
 
     @partial(jax.jit, static_argnums=(0,))
@@ -131,9 +134,8 @@ class CustomMobilizer(AbstractMobilizer):
         omega_2 = omega_1 + (theta_dt1 * y_col_dt0)
 
         x_col_dt1 = np.zeros((3,))
-        print(omega_1, y_col_dt0)
-        y_col_dt1 = skew_M @ omega_1 @ y_col_dt0
-        z_col_dt1 = skew_M @ omega_2 @ z_col_dt0
+        y_col_dt1 = (skew_M @ omega_1) @ y_col_dt0
+        z_col_dt1 = (skew_M @ omega_2) @ z_col_dt0
 
         W_FM_dt1 = jnp.column_stack([x_col_dt1, y_col_dt1, z_col_dt1])
 
@@ -198,12 +200,21 @@ class CustomMobilizer(AbstractMobilizer):
         location_dt0, orientation_dt0 = pose_dt0.reshape(2, -1)
         phi, theta, psi = orientation_dt0
         # R_FM = rot_z(psi) @ rot_y(theta) @ rot_x(phi)
+        # q_yaw = quaternion_from_axis_angle(psi, np.array([0, 0, 1]))
+        # q_pitch = quaternion_from_axis_angle(theta, np.array([0, 1, 0]))
+        # q_roll = quaternion_from_axis_angle(phi, np.array([1, 0, 0]))
+        # q = quaternion_multiply(quaternion_multiply(q_roll, q_pitch), q_yaw)
         # p_FM = SpatialPose(-R_FM.T @ location_dt0, dcm_to_quaternion(R_FM))
         q = euler_to_quaternion(phi, theta, psi)
-        r = transform_vector(quaternion_inverse(q), -location_dt0)
+        # q = normalize(q)
+        r = transform_vector(quaternion_inverse(q), location_dt0)
+        # r = location_dt0
         p_FM = SpatialPose(r, q)
 
         S_FM = jnp.vstack([pose_jacobian_dt0[:3], W_FM_dt0 @ pose_jacobian_dt0[3:]])
+        # jax.debug.print("p_FM = \n{x} = ", x=p_FM)
+        # jax.debug.print("S_FM = \n{x} = ", x=S_FM)
+        # jax.debug.print("S_FM.T = \n{x} = ", x=S_FM.T)
 
         # velocity-level evaluations
         location_dt1, orientation_dt1 = pose_dt1.reshape(2, -1)
@@ -216,6 +227,16 @@ class CustomMobilizer(AbstractMobilizer):
         spatial_acc = jnp.hstack([location_dt2, angular_acc])
 
         kinematics = MobilizerKinematics(p_FM, S_FM, spatial_vel, spatial_acc)
+
+        # jax.debug.print("angular_vel = {x} = ", x=angular_vel)
+        # jax.debug.print(
+        #     "W_FM_dt1 @ orientation_dt1 = {x} = ", x=W_FM_dt1 @ orientation_dt1
+        # )
+        # jax.debug.print(
+        #     "W_FM_dt0 @ orientation_dt2 = {x} = ", x=W_FM_dt0 @ orientation_dt2
+        # )
+        # jax.debug.print("angular_acc = {x} = ", x=angular_acc)
+
         return kinematics
 
 

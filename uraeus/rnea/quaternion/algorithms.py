@@ -92,6 +92,9 @@ def inverse_dynamics_call(
     )
     tau = evaluate_tau(joints_frames, joints_kin, joints_forces)
 
+    # print(f"joints_forces = \n{joints_forces}")
+    # print(f"tau = \n{tau}")
+
     return IDCallRes(tau, bodies_kin, joints_kin, joints_forces)
 
 
@@ -119,7 +122,10 @@ def forward_dynamics_call(
     H = JointInertiaMatrixOperations.construct_H(tree_data, joints_kin, qdt0)
 
     rhs = tau - C
-    qdt2 = jnp.linalg.solve(H, -rhs)
+    # print(f"H = \n{H}")
+    # print(f"C = \n{C}")
+    # print("")
+    qdt2 = jnp.linalg.solve(H, rhs)
     return qdt2
 
 
