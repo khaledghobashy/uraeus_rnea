@@ -80,16 +80,12 @@ class CustomMobilizer(AbstractMobilizer):
 
     @partial(jax.jit, static_argnums=(0,))
     def p_FM(self, qdt0: np.ndarray) -> SpatialPose:
-        # print(self.__class__.__name__)
         pose_dt0 = self.polynomials.pose_polynomials(qdt0)
-        # orientation, location = jnp.split(pose_dt0, 2)
         location, orientation = jnp.split(pose_dt0, 2)
         phi, theta, psi = orientation
-        # R_FM = rot_z(psi) @ rot_y(theta) @ rot_x(phi)
         q = euler_to_quaternion(phi, theta, psi)
-        # r = transform_vector(quaternion_inverse(q), -location)
-        r = transform_vector(q, location)
-        p_FM = SpatialPose(r, quaternion_inverse(q))
+        r = transform_vector(quaternion_inverse(q), -location)
+        p_FM = SpatialPose(r, q)
         return p_FM
 
     @partial(jax.jit, static_argnums=(0,))
@@ -208,6 +204,7 @@ class CustomMobilizer(AbstractMobilizer):
         q = euler_to_quaternion(phi, theta, psi)
         # q = normalize(q)
         r = transform_vector(quaternion_inverse(q), location_dt0)
+        # r = transform_vector(quaternion_inverse(q), -location_dt0)
         # r = location_dt0
         p_FM = SpatialPose(r, q)
 
@@ -284,7 +281,7 @@ class TranslationalMobilizer(CustomMobilizer):
     @partial(jax.jit, static_argnums=(0,))
     def p_FM(self, qdt0: np.ndarray) -> np.ndarray:
         z_dt0 = qdt0[0]
-        p_FM = SpatialPose(jnp.array([0, 0, -z_dt0]), jnp.array([1, 0, 0, 0]))
+        p_FM = SpatialPose(jnp.array([0, 0, z_dt0]), jnp.array([1, 0, 0, 0]))
         return p_FM
 
     @partial(jax.jit, static_argnums=(0,))
@@ -294,12 +291,12 @@ class TranslationalMobilizer(CustomMobilizer):
     @partial(jax.jit, static_argnums=(0,))
     def v_J(self, qdt0: np.ndarray, qdt1: np.ndarray) -> np.ndarray:
         z_dt1 = qdt1[0]
-        return jnp.array([0, 0, -z_dt1, 0, 0, 0])
+        return jnp.array([0, 0, z_dt1, 0, 0, 0])
 
     @partial(jax.jit, static_argnums=(0,))
     def a_J(self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray) -> np.ndarray:
         z_dt2 = qdt2[0]
-        return jnp.array([0, 0, -z_dt2, 0, 0, 0])
+        return jnp.array([0, 0, z_dt2, 0, 0, 0])
 
     @partial(jax.jit, static_argnums=(0,))
     def evaluate_kinematics(
