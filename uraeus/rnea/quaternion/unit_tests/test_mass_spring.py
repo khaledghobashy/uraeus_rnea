@@ -124,47 +124,47 @@ class MassSpringDamperTest(unittest.TestCase):
 if __name__ == "__main__":
 
     unittest.main()
-    # import scipy.integrate as integrate
-    # import matplotlib.pyplot as plt
+    import scipy.integrate as integrate
+    import matplotlib.pyplot as plt
 
-    # def simulate(ssode, ydt0, t_end):
+    def simulate(ssode, ydt0, t_end):
 
-    #     time_history = []
-    #     qdt0_history = []
-    #     qdt1_history = []
-    #     qdt2_history = []
+        time_history = []
+        qdt0_history = []
+        qdt1_history = []
+        qdt2_history = []
 
-    #     ydt0 = np.array([0, 0])
-    #     stepper = integrate.BDF(ssode, 0, ydt0, 10)
-    #     while stepper.status == "running":
-    #         y = stepper.y
-    #         ydt1 = ssode(stepper.t, y)
-    #         qdt0, qdt1 = y.reshape(2, -1)
-    #         _, qdt2 = ydt1.reshape(2, -1)
+        ydt0 = np.array([0, 0])
+        stepper = integrate.BDF(ssode, 0, ydt0, 10)
+        while stepper.status == "running":
+            y = stepper.y
+            ydt1 = ssode(stepper.t, y)
+            qdt0, qdt1 = y.reshape(2, -1)
+            _, qdt2 = ydt1.reshape(2, -1)
 
-    #         print(qdt0)
+            print(qdt0)
 
-    #         time_history.append(stepper.t)
-    #         qdt0_history.append(qdt0)
-    #         qdt1_history.append(qdt1)
-    #         qdt2_history.append(qdt2)
-    #         stepper.step()
+            time_history.append(stepper.t)
+            qdt0_history.append(qdt0)
+            qdt1_history.append(qdt1)
+            qdt2_history.append(qdt2)
+            stepper.step()
 
-    #     return time_history, qdt0_history, qdt1_history, qdt2_history
+        return time_history, qdt0_history, qdt1_history, qdt2_history
 
-    # analytical_model = AnalyticalMassSpringDamper(10, 10, 10)
-    # true_t, true_qdt0, true_qdt1, true_qdt2 = simulate(
-    #     analytical_model.ssode, np.array([0, 0]), 10
-    # )
+    analytical_model = AnalyticalMassSpringDamper(10, 10, 10)
+    true_t, true_qdt0, true_qdt1, true_qdt2 = simulate(
+        analytical_model.ssode, np.array([0, 0]), 10
+    )
 
-    # mutlibody_model = MassSpringDamperTest()
-    # mutlibody_model._build_multibody_system(10, 10, 10)
-    # test_t, test_qdt0, test_qdt1, test_qdt2 = simulate(
-    #     mutlibody_model._evaluate_multibody_forward_dynamics, np.array([0, 0]), 10
-    # )
+    mutlibody_model = MassSpringDamperTest()
+    mutlibody_model._build_multibody_system(10, 10, 10)
+    test_t, test_qdt0, test_qdt1, test_qdt2 = simulate(
+        mutlibody_model._evaluate_multibody_forward_dynamics, np.array([0, 0]), 10
+    )
 
-    # plt.figure()
-    # plt.plot(true_t, true_qdt0)
-    # plt.plot(test_t, test_qdt0)
-    # plt.grid()
-    # plt.show()
+    plt.figure()
+    plt.plot(true_t, true_qdt0)
+    plt.plot(test_t, test_qdt0)
+    plt.grid()
+    plt.show()

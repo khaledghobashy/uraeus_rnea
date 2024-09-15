@@ -92,14 +92,14 @@ def evaluate_joint_inertia_force(
 ) -> np.ndarray:
 
     # inertia forces from direct accelerations
-    fi_S_qdt2 = successor_I @ express_screw(successor_kin.p_GB, successor_kin.a_G)
-    # fi_S_qdt2 = successor_I @ successor_kin.a_B
+    # fi_S_qdt2 = successor_I @ express_screw(successor_kin.p_GB, successor_kin.a_G)
+    fi_S_qdt2 = successor_I @ successor_kin.a_B
 
     # inertia forces from rotational velocity
-    # fi_S_qdt1 = force_spatial_cross(
-    #     successor_kin.v_B, (successor_I @ successor_kin.v_B)
-    # )
-    fi_S_qdt1 = screw_cross(successor_kin.v_B, (successor_I @ successor_kin.v_B))
+    fi_S_qdt1 = -force_spatial_cross(
+        successor_kin.v_B, (successor_I @ successor_kin.v_B)
+    )
+    # fi_S_qdt1 = screw_cross(successor_kin.v_B, (successor_I @ successor_kin.v_B))
     # Total inertia forces
     fi_S = fi_S_qdt2 + fi_S_qdt1
 
