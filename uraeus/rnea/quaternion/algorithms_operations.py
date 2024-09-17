@@ -22,7 +22,7 @@ from uraeus.rnea.quaternion.joints import (
 from uraeus.rnea.quaternion.mobilizers import MobilizerForces
 
 
-# @jax.jit
+@jax.jit
 def evaluate_successor_kinematics(
     predecessor_kin: BodyKinematics,
     joint_kin: JointKinematics,
@@ -84,7 +84,7 @@ def screw_cross(v1: np.ndarray, v2: np.ndarray) -> np.ndarray:
     return jnp.array([*v3_v, *v3_w])
 
 
-# @jax.jit
+@jax.jit
 def evaluate_joint_inertia_force(
     successor_kin: BodyKinematics,
     successor_I: np.ndarray,
@@ -123,7 +123,7 @@ def evaluate_joint_inertia_force(
     return fb_S
 
 
-# @jax.jit
+@jax.jit
 def construct_mobilizer_force(
     fi_S: np.ndarray,
     joint_frames: JointFrames,
@@ -140,7 +140,7 @@ def construct_mobilizer_force(
     return MobilizerForces(fi_S, fc_S, fa_S, fc_G, tau)
 
 
-# @jax.jit
+@jax.jit
 def extract_force_components(
     fi_S: np.ndarray, joint_frames: JointFrames, joint_kin: JointKinematics
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -159,7 +159,7 @@ def extract_force_components(
     return fc_S, fa_S, tau
 
 
-# @jax.jit
+@jax.jit
 def translational_spatial_vector(v: np.ndarray) -> np.ndarray:
     rotational_part = np.zeros((3,))
     translational_part, _ = v.reshape(2, -1)
