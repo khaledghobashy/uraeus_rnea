@@ -129,7 +129,7 @@ def quaternion_multiply(q1, q2):
     return normalize(final_quaternion)
 
 
-# @jax.jit
+@jax.jit
 def transform_vector(pdt0F_G: np.ndarray, u_F: np.ndarray):
     w, v = jnp.split(pdt0F_G, [1])
     # w = w[0]
@@ -377,6 +377,7 @@ def quaternion_from_axis_angle(angle: float, axis: np.ndarray):
     return jnp.array([c, *(s * axis)])
 
 
+@jax.jit
 def quaternion_inverse(q: np.ndarray):
     return jnp.array([q[0], *(-q[1:])])
 

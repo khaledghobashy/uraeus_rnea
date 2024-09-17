@@ -107,7 +107,7 @@ class CustomMobilizer(AbstractMobilizer):
         W_FM_dt0 = jnp.column_stack([a1, a2, a3])
         return W_FM_dt0
 
-    # @partial(jax.jit, static_argnums=(0,))
+    @partial(jax.jit, static_argnums=(0,))
     def W_FM_dt1(self, W_FM_dt0: np.ndarray, pose_dt1: np.ndarray) -> np.ndarray:
         x_col_dt0, y_col_dt0, z_col_dt0 = [a.flatten() for a in jnp.hsplit(W_FM_dt0, 3)]
         # print(f"y_col_dt0.shape = {y_col_dt0[None,:].shape}")
@@ -202,11 +202,8 @@ class CustomMobilizer(AbstractMobilizer):
         # q = quaternion_multiply(quaternion_multiply(q_roll, q_pitch), q_yaw)
         # p_FM = SpatialPose(-R_FM.T @ location_dt0, dcm_to_quaternion(R_FM))
         q = euler_to_quaternion(phi, theta, psi)
-        # q = normalize(q)
         r = transform_vector(quaternion_inverse(q), location_dt0)
-        # r = transform_vector(quaternion_inverse(q), -location_dt0)
-        # r = location_dt0
-        p_FM = SpatialPose(r, q)
+        p_FM = SpatialPose(location_dt0, q)
 
         S_FM = jnp.vstack([pose_jacobian_dt0[:3], W_FM_dt0 @ pose_jacobian_dt0[3:]])
         # jax.debug.print("p_FM = \n{x} = ", x=p_FM)

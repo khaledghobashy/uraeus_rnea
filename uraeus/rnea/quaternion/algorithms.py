@@ -26,7 +26,7 @@ from uraeus.rnea.quaternion.tree_traversals import (
 )
 
 
-# @partial(jax.jit, static_argnums=(0,))
+@partial(jax.jit, static_argnums=(0,))
 def split_coordinates(
     idx: Tuple[int], qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
 ) -> Iterable[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
@@ -61,7 +61,7 @@ class IDCallRes(NamedTuple):
     joints_forces: List[np.ndarray]
 
 
-# @partial(jax.jit, static_argnums=(0,))
+@partial(jax.jit, static_argnums=(0,))
 def inverse_dynamics_call(
     tree_data: MultiBodyData,
     external_forces: List[List[np.ndarray]],
@@ -98,7 +98,7 @@ def inverse_dynamics_call(
     return IDCallRes(tau, bodies_kin, joints_kin, joints_forces)
 
 
-# @partial(jax.jit, static_argnums=(0,))
+@partial(jax.jit, static_argnums=(0,))
 def evaluate_C(
     tree_data: MultiBodyData,
     external_forces: List[List[np.ndarray]],
@@ -110,7 +110,7 @@ def evaluate_C(
     return res
 
 
-# @partial(jax.jit, static_argnums=(0,))
+@partial(jax.jit, static_argnums=(0,))
 def forward_dynamics_call(
     tree_data: MultiBodyData,
     external_forces: List[List[np.ndarray]],
@@ -129,7 +129,7 @@ def forward_dynamics_call(
     return qdt2
 
 
-# @jax.jit
+@jax.jit
 def eval_successor_acc(
     predecessor_acc: np.ndarray, joint_kin: JointKinematics
 ) -> np.ndarray:
@@ -145,7 +145,7 @@ node_acceleration_accumulator = accumulate_root_to_leaf(
 
 class JointInertiaMatrixOperations(NamedTuple):
     @classmethod
-    # @partial(jax.jit, static_argnums=(0, 1))
+    @partial(jax.jit, static_argnums=(0, 1))
     def construct_H(
         cls,
         tree_data: MultiBodyData,
@@ -161,7 +161,7 @@ class JointInertiaMatrixOperations(NamedTuple):
         return jnp.column_stack(H_columns)
 
     @staticmethod
-    # @partial(jax.jit, static_argnums=(0,))
+    @partial(jax.jit, static_argnums=(0,))
     def construct_new_acc(
         tree_data: MultiBodyData,
         joints_kin: List[JointKinematics],
@@ -182,7 +182,7 @@ class JointInertiaMatrixOperations(NamedTuple):
         return new_kin
 
     @staticmethod
-    # @partial(jax.jit, static_argnums=(0,))
+    @partial(jax.jit, static_argnums=(0,))
     def traverse(
         tree_data: MultiBodyData,
         joints_kin: List[JointKinematics],
