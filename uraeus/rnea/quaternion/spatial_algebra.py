@@ -12,7 +12,7 @@ jax.config.update("jax_enable_x64", True)
 jax.config.update("jax_traceback_filtering", "off")
 
 
-# @jax.jit
+@jax.jit
 def vsplit(arr: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
     """Split an 2D array `arr` into two equally sized sections vertically.
     This mimics the `jnp.vspilt(arr, 2)`, but uses a smart `reshape` trick,
@@ -32,7 +32,7 @@ def vsplit(arr: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
     return top_half, low_half
 
 
-# @jax.jit
+@jax.jit
 def hsplit(arr: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
     """Split an 2D array `arr` into two equally sized sections horizontally.
     This mimics the `jnp.hspilt(arr, 2)`, but uses a smart `.reshape` trick,
@@ -143,17 +143,6 @@ def transform_vector(pdt0F_G: np.ndarray, u_F: np.ndarray):
     return uF_G
 
 
-# # @jax.jit
-# def transform_vector(pdt0F_G: np.ndarray, u_F: np.ndarray):
-#     # w, v = jnp.split(pdt0F_G, [1])
-#     # w = w[0]
-
-#     uF_G = quaternion_multiply(
-#         quaternion_inverse(pdt0F_G), quaternion_multiply(pdt0F_G, np.array([0, *u_F]))
-#     )
-#     return uF_G[1:]
-
-
 @register_pytree_node_class
 class SpatialPose(object):
 
@@ -179,47 +168,16 @@ class SpatialPose(object):
             _description_
         """
 
-        # new_q = quaternion_multiply(other.q, self.q) # transforms from P -> S
-        # self_r_in_other = transform_vector(other.q, self.r)
-        # new_r_in_self = self_r_in_other + other.r
-        # return SpatialPose(new_r_in_self, new_q)
-        # how to move self to other
-        # new_q = quaternion_multiply(self.q, other.q)  # transforms from P -> S
-
-        # Good code
         new_q = quaternion_multiply(other.q, self.q)
         # transforms from P -> S
         self_r_in_other = transform_vector(other.inv().q, self.r)
         new_r_in_self = self_r_in_other + other.r
         new_pose = SpatialPose(new_r_in_self, new_q)
 
-        # new_q = quaternion_multiply(other.q, self.q)
-        # # transforms from P -> S
-        # other_r_in_self = transform_vector(other.inv().q, other.r)
-        # new_r_in_self = other_r_in_self + self.r
-        # new_pose = SpatialPose(new_r_in_self, new_q)
-
-        # new_q = quaternion_multiply(other.q, self.q)
-        # # transforms from P -> S
-        # other_r_in_self = transform_vector(other.inv().q, other.r)
-        # new_r_in_self = other_r_in_self + self.r
-        # new_pose = SpatialPose(new_r_in_self, new_q)
-
-        # print(f"self_r_in_other = {self_r_in_other}")
-        # print(f"other.r = {other.r}")
-        # print(f"new_r_in_self = {new_r_in_self}")
-        # print("")
-
-        # Like old
-        # new_q = quaternion_multiply(other.q, self.q)  # transforms from P -> S
-        # self_r_in_other = transform_vector(other.inv().q, self.r)
-        # new_r_in_self = self_r_in_other + other.r
-        # new_pose = SpatialPose(-transform_vector(new_q, new_r_in_self), new_q)
         return new_pose
 
     def inv(self):
         q_inv = quaternion_inverse(self.q)
-        # p_inv = SpatialPose(transform_vector(q_inv, -self.r), q_inv)
         p_inv = SpatialPose(-transform_vector(self.q, self.r), q_inv)
         return p_inv
 
@@ -256,22 +214,11 @@ class SpatialScrew(object):
         return cls(*args)
 
 
-# def transform_screw(pose: SpatialPose, screw: SpatialScrew) -> SpatialScrew:
-#     r, w = jnp.split(2)
-#     new_r = transform_vector(pose.q, screw.r) + (skew_M @ pose.r @ screw.w)
-#     new_w = transform_vector(pose.q, screw.w)
-#     return SpatialScrew(new_r, new_w)
-
-
 @jax.jit
 def transform_screw(pose: SpatialPose, screw: np.ndarray) -> np.ndarray:
     v, w = jnp.split(screw, 2)
     new_w = transform_vector(pose.q, w)
-    # new_v = transform_vector(pose.q, v) + transform_vector(
-    #     pose.q, ((skew_M @ pose.r) @ w)
-    # )
     new_v = transform_vector(pose.q, v + (skew_M @ pose.r) @ w)
-
     new_screw = jnp.array([*new_v, *new_w])
     return new_screw
 
@@ -428,8 +375,6 @@ def G(p: np.ndarray) -> np.ndarray:
     np.ndarray
         G matrix of shape (3,4)
     """
-    # e0 = p[0]
-    # e = p[1:]
     e0, e = jnp.split(p, [1])
     I = np.eye(3)
     m = jnp.hstack((-e[:, None], (e0 * I) - skew_M @ e))

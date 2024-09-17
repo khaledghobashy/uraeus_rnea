@@ -9,82 +9,8 @@ from uraeus.rnea.quaternion.joints import (
     JointConfigInputs,
     FreeJoint,
     TranslationalJoint,
-    RevoluteJoint,
 )
 from uraeus.rnea.quaternion.topologies import MultiBodyTree, Model
-from uraeus.rnea.quaternion.tree_traversals import extract_mobilizer_forces
-
-
-def emulate_free_joint(
-    model: MultiBodyTree, predecessor: str, successor: str, succ_data: RigidBodyData
-) -> MultiBodyTree:
-    dummy_body_data = RigidBodyData()
-
-    x_axis_config = JointConfigInputs(
-        pos=np.zeros((3,)), z_axis=np.array([1, 0, 0]), x_axis=None
-    )
-    y_axis_config = JointConfigInputs(
-        pos=np.zeros((3,)), z_axis=np.array([0, 1, 0]), x_axis=None
-    )
-    z_axis_config = JointConfigInputs(
-        pos=np.zeros((3,)), z_axis=np.array([0, 0, 1]), x_axis=None
-    )
-
-    model.add_joint(
-        joint_name="x_rotation",
-        predecessor=predecessor,
-        successor="d1",
-        succ_data=dummy_body_data,
-        joint_type=RevoluteJoint,
-        joint_data=x_axis_config,
-    )
-
-    model.add_joint(
-        joint_name="y_rotation",
-        predecessor="d1",
-        successor="d2",
-        succ_data=dummy_body_data,
-        joint_type=RevoluteJoint,
-        joint_data=y_axis_config,
-    )
-
-    model.add_joint(
-        joint_name="z_rotation",
-        predecessor="d2",
-        successor="d3",
-        succ_data=dummy_body_data,
-        joint_type=RevoluteJoint,
-        joint_data=z_axis_config,
-    )
-
-    model.add_joint(
-        joint_name="x_trans",
-        predecessor="d3",
-        successor="d4",
-        succ_data=dummy_body_data,
-        joint_type=TranslationalJoint,
-        joint_data=x_axis_config,
-    )
-
-    model.add_joint(
-        joint_name="y_trans",
-        predecessor="d4",
-        successor="d5",
-        succ_data=dummy_body_data,
-        joint_type=TranslationalJoint,
-        joint_data=y_axis_config,
-    )
-
-    model.add_joint(
-        joint_name="z_trans",
-        predecessor="d5",
-        successor=successor,
-        succ_data=succ_data,
-        joint_type=TranslationalJoint,
-        joint_data=z_axis_config,
-    )
-
-    return model
 
 
 class AnalyticalMassSpringDamper(object):
@@ -160,9 +86,6 @@ class MassSpringDamperTest(unittest.TestCase):
         qdt2_true = self._evaluate_analytical_forward_dynamics(t, ydt0)
         qdt2_test = self._evaluate_multibody_forward_dynamics(t, ydt0_multibody)
 
-        print("true_sol = ", qdt2_true)
-        print("test_sol = ", qdt2_test)
-        print("")
         return qdt2_true, np.array([qdt2_test[2], qdt2_test[2 + 6]])
 
     def _evaluate_analytical_forward_dynamics(self, t, ydt0):
@@ -192,7 +115,6 @@ class MassSpringDamperTest(unittest.TestCase):
         j1_data = JointConfigInputs(np.array([0, 0, 1]), np.array([0, 0, 1]), None)
 
         tree.add_joint("j1", "ground", "m1", m1_data, FreeJoint, j1_data)
-        # tree = emulate_free_joint(tree, "ground", "m1", m1_data)
 
         model = Model(tree)
 
@@ -271,9 +193,6 @@ class DoubleMassSpringDamperTest(unittest.TestCase):
         ydt2_true = self._evaluate_true_forward_dynamics(t, ydt0)
         ydt2_test = self._evaluate_test_forward_dynamics(t, ydt0_multibody)
 
-        print("true_sol = ", ydt2_true)
-        print("test_sol = ", ydt2_test)
-        print("")
         return ydt2_true, np.array(
             [ydt2_test[2], ydt2_test[2 + 6], ydt2_test[2 + 12], ydt2_test[2 + 6 + 12]]
         )
@@ -320,7 +239,6 @@ class DoubleMassSpringDamperTest(unittest.TestCase):
 
         tree.add_joint("j1", "ground", "m1", m1_data, TranslationalJoint, j1_data)
         tree.add_joint("j2", "m1", "m2", m2_data, TranslationalJoint, j2_data)
-        # tree = emulate_free_joint(tree, "ground", "m1", m1_data)
 
         model = Model(tree)
 
@@ -357,65 +275,3 @@ class DoubleMassSpringDamperTest(unittest.TestCase):
 if __name__ == "__main__":
 
     unittest.main()
-    # import scipy.integrate as integrate
-    # import matplotlib.pyplot as plt
-
-    # def simulate(ssode, ydt0, t_end):
-
-    #     time_history = []
-    #     qdt0_history = []
-    #     qdt1_history = []
-    #     qdt2_history = []
-
-    #     stepper = integrate.BDF(ssode, 0, ydt0, 10)
-    #     while stepper.status == "running":
-    #         y = stepper.y
-    #         ydt1 = ssode(stepper.t, y)
-    #         qdt0, qdt1 = y.reshape(2, -1)
-    #         _, qdt2 = ydt1.reshape(2, -1)
-
-    #         print(qdt0)
-
-    #         time_history.append(stepper.t)
-    #         qdt0_history.append(qdt0)
-    #         qdt1_history.append(qdt1)
-    #         qdt2_history.append(qdt2)
-    #         stepper.step()
-
-    #     return time_history, qdt0_history, qdt1_history, qdt2_history
-
-    # # analytical_model = AnalyticalMassSpringDamper(10, 10, 10)
-    # # true_t, true_qdt0, true_qdt1, true_qdt2 = simulate(
-    # #     analytical_model.ssode, np.array([0, 0]), 10
-    # # )
-
-    # # mutlibody_model = MassSpringDamperTest()
-    # # mutlibody_model._build_multibody_system(10, 10, 10)
-    # # test_t, test_qdt0, test_qdt1, test_qdt2 = simulate(
-    # #     mutlibody_model._evaluate_multibody_forward_dynamics, np.zeros((12,)), 10
-    # # )
-
-    # test = DoubleMassSpringDamperTest()
-    # test.setUp()
-    # # true_system = test._build_true_system(10, 10, 10)
-    # # test_system = test._build_test_system(10, 10, 10)
-
-    # test_t, test_qdt0, test_qdt1, test_qdt2 = simulate(
-    #     test._evaluate_test_forward_dynamics, np.zeros((24,)), 10
-    # )
-
-    # true_t, true_qdt0, true_qdt1, true_qdt2 = simulate(
-    #     test._evaluate_true_forward_dynamics, np.zeros((4,)), 10
-    # )
-
-    # plt.figure()
-    # plt.plot(true_t, np.array(true_qdt0)[:, 0])
-    # plt.plot(test_t, np.array(test_qdt0)[:, 2])
-    # plt.grid()
-
-    # plt.figure()
-    # plt.plot(true_t, np.array(true_qdt0)[:, 1])
-    # plt.plot(test_t, np.array(test_qdt0)[:, 2 + 6])
-    # plt.grid()
-
-    # plt.show()

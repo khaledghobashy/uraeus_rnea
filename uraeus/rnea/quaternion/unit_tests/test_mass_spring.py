@@ -79,9 +79,6 @@ class MassSpringDamperTest(unittest.TestCase):
         qdt2_true = self._evaluate_analytical_forward_dynamics(t, ydt0)
         qdt2_test = self._evaluate_multibody_forward_dynamics(t, ydt0)
 
-        print("true_sol = ", qdt2_true)
-        print("test_sol = ", qdt2_test)
-        print("")
         return qdt2_true, qdt2_test
 
     def _evaluate_analytical_forward_dynamics(self, t, ydt0):
@@ -141,8 +138,6 @@ if __name__ == "__main__":
             ydt1 = ssode(stepper.t, y)
             qdt0, qdt1 = y.reshape(2, -1)
             _, qdt2 = ydt1.reshape(2, -1)
-
-            print(qdt0)
 
             time_history.append(stepper.t)
             qdt0_history.append(qdt0)

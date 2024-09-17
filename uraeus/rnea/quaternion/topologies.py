@@ -5,7 +5,7 @@ import numpy as np
 
 from uraeus.rnea.quaternion.bodies import RigidBody, RigidBodyData, BodyKinematics
 from uraeus.rnea.quaternion.tree_traversals import base_to_tip
-from uraeus.rnea.quaternion.graphs import Graph, Tree, contstruct_traversal_orders
+from uraeus.rnea.quaternion.graphs import Graph, Tree, construct_traversal_orders
 
 from uraeus.rnea.quaternion.joints import (
     AbstractJoint,
@@ -168,7 +168,7 @@ def construct_hybriddynamics_data(
 def construct_multibodydata(topology: MultiBodyTree) -> MultiBodyData:
     func_joints = tuple(map(construct_functional_joint, topology.joints.values()))
     bodies_inertias = [b.I for b in topology.bodies.values()]
-    forward_traversal, backward_traversal = contstruct_traversal_orders(topology.tree)
+    forward_traversal, backward_traversal = construct_traversal_orders(topology.tree)
     qdt0_idx = [0] + list(np.cumsum([j.nj for j in func_joints]))
     qdt1_idx = qdt0_idx  # Equal each other for now. Later could be different.
 
@@ -221,7 +221,6 @@ class Model(object):
         forces = [
             list(forces_dict.values()) for name, forces_dict in self.forces_map.items()
         ]
-        # print(forces)
         res = inverse_dynamics_call(self.tree_data, forces, qdt0, qdt1, qdt2)
         return res
 
@@ -233,17 +232,3 @@ class Model(object):
         ]
         qdt2 = forward_dynamics_call(self.tree_data, forces, qdt0, qdt1, tau)
         return qdt2
-
-
-# =============================================================================
-# Obselete Code
-# =============================================================================
-
-# def construct_out_joints_map(
-#     model_tree: MultiBodyTree,
-# ) -> Dict[str, List[JointInstance]]:
-
-#     out_joints = {b: [] for b in model_tree.bodies}
-#     for j in model_tree.joints.values():
-#         out_joints[j.joint_data.predecessor.name].append(j)
-#     return out_joints
