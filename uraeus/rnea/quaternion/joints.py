@@ -1,6 +1,4 @@
-from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, List, Optional, NamedTuple, Set, Tuple, Type
-from functools import partial
+from typing import Callable, NamedTuple, Type, List
 
 import jax
 import jax.numpy as jnp
@@ -13,8 +11,6 @@ from uraeus.rnea.quaternion.motion_equations import (
 from uraeus.rnea.quaternion.spatial_algebra import (
     SpatialPose,
     skew_M,
-    dcm_to_quaternion,
-    quaternion_to_dcm,
     quaternion_from_axis_angle,
     transform_vector,
     transform_screw,
@@ -235,30 +231,10 @@ def initialize_joint(
     else:
         q_JG = np.array([1, 0, 0, 0])
 
-    print("Initializing Joint:")
-    print(f"Joint frame in global = \n", quaternion_to_dcm(q_JG))
-
     p_JG = SpatialPose(transform_vector(quaternion_inverse(q_JG), -location), q_JG)
-    # p_JG = SpatialPose(transform_vector(q_JG, location), q_JG)
-    print(f"Joint pose in global = \n", p_JG)
-    # p_JG = SpatialPose(transform_vector(quaternion_inverse(q_JG), location), q_JG)
-    # p_JG = SpatialPose(location, q_JG)
 
-    # p_PF = p_GP @ p_JG  # P -> F from Predecessor to joint
-    # p_SM = p_GS @ p_JG  # P -> F from Predecessor to joint
-    # p_PF = p_JG.inv() @ p_GP.inv()
-    # p_SM = p_JG.inv() @ p_GS.inv()
-    # p_PF = (p_GP @ p_JG).inv()
-    # p_SM = (p_GS @ p_JG).inv()
     p_FP = p_GP @ p_JG
     p_MS = p_GS @ p_JG
-
-    print(f"p_MS = \n", p_MS)
-    print(f"p_SM = \n", p_MS.inv())
-    # print(f"p_MS = \n", quaternion_to_dcm(p_MS.q))
-    # print(f"p_PF.r = {p_PF.r}")
-    # print(f"p_SM.r = {p_SM.inv().r}")
-    print("\n")
 
     return JointFrames(p_MS.inv(), p_FP.inv())
 
