@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from collections import defaultdict
 from functools import reduce, partial
 
@@ -66,15 +66,15 @@ def accumulate_root_to_leaf(
     root_initial: Any,
     cumfunc: Callable[[Any, Any], Any],
 ) -> Callable[[List[Any], List[Tuple[int, int, int]]], List[Any]]:
-    # @partial(jax.jit, static_argnums=(0,))
+    @partial(jax.jit, static_argnums=(0,))
     def func(
-        traversal_order: Tuple[Tuple[int, int, int], ...], edges_wieghts: Tuple[Any]
+        traversal_order: Tuple[Tuple[int, int, int], ...], edges_weights: Tuple[Any]
     ):
         nodes_vals = [root_initial]
 
         for _, edge_index, predecessor_index in traversal_order:
             successor_val = cumfunc(
-                nodes_vals[predecessor_index], edges_wieghts[edge_index]
+                nodes_vals[predecessor_index], edges_weights[edge_index]
             )
             nodes_vals.append(successor_val)
         return nodes_vals
@@ -104,15 +104,15 @@ def accumulate_leaf_to_root(
     return partial(jax.jit(func, static_argnums=(2,)))
 
 
-def contstruct_traversal_orders(tree: Tree):
-    nodes_indicies = {n: i for i, n in enumerate(tree.nodes)}
+def construct_traversal_orders(tree: Tree):
+    nodes_indices = {n: i for i, n in enumerate(tree.nodes)}
     base_to_tip = [
-        (nodes_indicies[s], i, nodes_indicies[p]) for i, (p, s) in enumerate(tree.edges)
+        (nodes_indices[s], i, nodes_indices[p]) for i, (p, s) in enumerate(tree.edges)
     ]
     edges_indices = {e: i for i, e in enumerate(reversed(tree.edges))}
     tip_to_base = [
-        (nodes_indicies[node], tuple(edges_indices[(node, c)] for c in childern))
-        for node, childern in reversed(tree.adj_list.items())
+        (nodes_indices[node], tuple(edges_indices[(node, c)] for c in children))
+        for node, children in reversed(tree.adj_list.items())
     ]
     return tuple(base_to_tip), tuple(tip_to_base)
 

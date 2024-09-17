@@ -28,12 +28,6 @@ class DoublePendulumTest(unittest.TestCase):
         self.m1 = 1
         self.m2 = 1
 
-        # self.theta1_dt0_f = lambda t: np.radians(45)
-        # self.theta2_dt0_f = lambda t: np.radians(-90)
-
-        # self.theta1_dt0_f = lambda t: t
-        # self.theta2_dt0_f = lambda t: t
-
         self.theta1_dt0_f = lambda t: 2 * jnp.sin(t)
         self.theta2_dt0_f = lambda t: 1.5 * jnp.sin(2 * t)
 
@@ -72,8 +66,6 @@ class DoublePendulumTest(unittest.TestCase):
             *[self._evaluate_inverse_dynamics(t) for t in time_array]
         )
 
-        # test_sol, true_sol = self._evaluate_inverse_dynamics(time_array[29])
-
         np.testing.assert_almost_equal(true_sol, test_sol)
 
     def test_forward_dynamics(self):
@@ -95,9 +87,6 @@ class DoublePendulumTest(unittest.TestCase):
 
         qdt2_test = self.multibody_system.forward_dynamics_pass(qdt0, qdt1, tau)
 
-        print("true_sol = ", qdt2)
-        print("test_sol = ", qdt2_test)
-        print("")
         return qdt2, qdt2_test
 
     def _evaluate_forward_kinematics(self, t):
@@ -108,9 +97,6 @@ class DoublePendulumTest(unittest.TestCase):
     def _evaluate_inverse_dynamics(self, t):
         test_sol = self._evaluate_multibody_inverse_dynamics(t)
         true_sol = self._evaluate_analytical_inverse_dynamics(t)
-        print("\n")
-        print(true_sol, "\n", test_sol)
-        print("")
         return test_sol, true_sol
 
     def _evaluate_multibody_forward_kinematics(self, t):
@@ -151,16 +137,6 @@ class DoublePendulumTest(unittest.TestCase):
         )
 
         return sys_kinematics
-
-    # def _evaluate_analytical_forward_kinematics(self, t):
-    #     analytical_system = lambda t: analytic_system(
-    #         self.l1, self.l2, self.theta1_dt0_f, self.theta2_dt0_f, t
-    #     )
-    #     return analytical_system(t)
-    # def _evaluate_analytical_inverse_dynamics(self, t):
-    #     return inverse_dynamics(
-    #         self.l1, self.l2, self.m1, self.m2, self.theta1_dt0_f, self.theta2_dt0_f, t
-    #     )
 
     def _evaluate_analytical_forward_kinematics(self, t):
         qdt0 = np.array([self.theta1_dt0_f(t), self.theta2_dt0_f(t)])
@@ -241,7 +217,6 @@ if __name__ == "__main__":
 
     def evaluate_multibody_forward_dynamics(model, t, ydt0):
         qdt0, qdt1 = ydt0.reshape(2, -1)
-        # print(ydt0.shape)
         qdt2 = model.forward_dynamics_pass(qdt0, qdt1, np.zeros_like(qdt1))
 
         return np.array([*qdt1, *qdt2])
@@ -259,8 +234,6 @@ if __name__ == "__main__":
             ydt1 = ssode(stepper.t, y)
             qdt0, qdt1 = y.reshape(2, -1)
             _, qdt2 = ydt1.reshape(2, -1)
-
-            print(qdt0)
 
             time_history.append(stepper.t)
             qdt0_history.append(qdt0)

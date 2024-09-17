@@ -1,7 +1,6 @@
 from functools import partial
-from itertools import repeat
 from operator import sub
-from typing import Iterable, List, Dict, NamedTuple, Tuple
+from typing import Iterable, List, NamedTuple, Tuple
 
 import jax
 
@@ -14,7 +13,6 @@ from uraeus.rnea.quaternion.spatial_algebra import (
     SpatialPose,
     express_screw,
     transform_screw,
-    transform_screw_force,
 )
 
 from uraeus.rnea.quaternion.graphs import accumulate_root_to_leaf
@@ -92,9 +90,6 @@ def inverse_dynamics_call(
     )
     tau = evaluate_tau(joints_frames, joints_kin, joints_forces)
 
-    # print(f"joints_forces = \n{joints_forces}")
-    # print(f"tau = \n{tau}")
-
     return IDCallRes(tau, bodies_kin, joints_kin, joints_forces)
 
 
@@ -120,11 +115,7 @@ def forward_dynamics_call(
 ) -> np.ndarray:
     C, _, joints_kin, _ = evaluate_C(tree_data, external_forces, qdt0, qdt1)
     H = JointInertiaMatrixOperations.construct_H(tree_data, joints_kin, qdt0)
-
     rhs = tau - C
-    # print(f"H = \n{H}")
-    # print(f"C = \n{C}")
-    # print("")
     qdt2 = jnp.linalg.solve(H, rhs)
     return qdt2
 
@@ -248,10 +239,7 @@ class HybridDynamics(object):
 
 
 def _helper(predecessor_p_GB: SpatialPose, joint: JointKinematics):
-    # print(f"joint_kin.p_PS = {joint.p_PS}")
-
     p_GB = joint.p_PS @ predecessor_p_GB
-    # p_BG = p_GB.inv()
     return p_GB
 
 
@@ -260,7 +248,7 @@ _bodies_config_func = accumulate_root_to_leaf(
 )
 
 
-# @partial(jax.jit, static_argnums=(0,))
+@partial(jax.jit, static_argnums=(0,))
 def ext_forces_to_gen_forces(
     tree_data: MultiBodyData,
     joints_kin: Tuple[JointKinematics, ...],
@@ -285,71 +273,3 @@ def ext_forces_to_gen_forces(
 
     tau = evaluate_tau(joints_frames, joints_kin, joints_forces)
     return tau
-
-
-# =============================================================================
-# Obselete
-# =============================================================================
-# def evaluate_H(
-#     tree_data: MultiBodyData,
-#     external_forces: List[List[np.ndarray]],
-#     qdt0: np.ndarray,
-#     qdt1: np.ndarray,
-#     C_vec: np.ndarray,
-# ) -> np.ndarray:
-
-#     boolean_deltas = np.eye(len(qdt0))
-#     partial_func = partial(
-#         inverse_dynamics_call,
-#         tree_data,
-#         external_forces,
-#         qdt0,
-#         qdt1,
-#     )
-#     # H_columns = map(partial_func, boolean_deltas)
-#     # H_columns = map(sub, H_columns, repeat(C_vec, len(qdt0)))
-#     # H_matrix = np.column_stack(list(H_columns))
-
-#     H_columns = [
-#         (inverse_dynamics_call(tree_data, external_forces, qdt0, qdt1, col).tau - C_vec)
-#         for col in boolean_deltas
-#     ]
-#     H_matrix = np.column_stack(H_columns)
-
-#     return H_matrix
-
-
-# def evaluate_H2(
-#     tree_data: MultiBodyData,
-#     qdt0: np.ndarray,
-# ) -> np.ndarray:
-
-#     ext_forces = [[] for _ in qdt0]
-#     boolean_deltas = np.eye(len(qdt0))
-#     partial_func = partial(
-#         inverse_dynamics_call,
-#         tree_data,
-#         ext_forces,
-#         qdt0,
-#         np.zeros_like(qdt0),
-#     )
-#     H_columns = map(partial_func, boolean_deltas)
-#     H_matrix = np.column_stack(list(H_columns))
-
-#     return H_matrix
-
-
-# def forward_dynamics_call(
-#     tree_data: MultiBodyData,
-#     external_forces: List[List[np.ndarray]],
-#     qdt0: np.ndarray,
-#     qdt1: np.ndarray,
-#     tau: np.ndarray,
-# ) -> np.ndarray:
-
-#     C = evaluate_C(tree_data, external_forces, qdt0, qdt1)
-#     H = evaluate_H(tree_data, external_forces, qdt0, qdt1, C)
-
-#     rhs = tau - C
-#     qdt2 = np.linalg.solve(H, rhs)
-#     return qdt2
