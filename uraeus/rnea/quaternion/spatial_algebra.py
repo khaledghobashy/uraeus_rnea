@@ -80,6 +80,18 @@ skew_M = levi_cevita_tensor(3)
 
 @jax.jit
 def rot_x(theta: float) -> jnp.ndarray:
+    """Generates a rotation matrix for a rotation around the x-axis.
+
+    Parameters
+    ----------
+    theta : float
+        The rotation angle in radians.
+
+    Returns
+    -------
+    jnp.ndarray
+        The 3x3 rotation matrix.
+    """
     c = jnp.cos(theta)
     s = jnp.sin(theta)
 
@@ -89,6 +101,18 @@ def rot_x(theta: float) -> jnp.ndarray:
 
 @jax.jit
 def rot_y(theta: float) -> jnp.ndarray:
+    """Generates a rotation matrix for a rotation around the y-axis.
+
+    Parameters
+    ----------
+    theta : float
+        The rotation angle in radians.
+
+    Returns
+    -------
+    jnp.ndarray
+        The 3x3 rotation matrix.
+    """
     c = jnp.cos(theta)
     s = jnp.sin(theta)
 
@@ -98,6 +122,18 @@ def rot_y(theta: float) -> jnp.ndarray:
 
 @jax.jit
 def rot_z(theta: float) -> jnp.ndarray:
+    """Generates a rotation matrix for a rotation around the z-axis.
+
+    Parameters
+    ----------
+    theta : float
+        The rotation angle in radians.
+
+    Returns
+    -------
+    jnp.ndarray
+        The 3x3 rotation matrix.
+    """
     c = jnp.cos(theta)
     s = jnp.sin(theta)
 
@@ -107,15 +143,19 @@ def rot_z(theta: float) -> jnp.ndarray:
 
 @jax.jit
 def quaternion_multiply(q1, q2):
-    """
-    Multiplies two quaternions.
+    """Multiplies two quaternions.
 
-    Args:
-        Q0 (np.ndarray): A 4-element array containing the first quaternion (q01, q11, q21, q31).
-        Q1 (np.ndarray): A 4-element array containing the second quaternion (q02, q12, q22, q32).
+    Parameters
+    ----------
+    q1 (np.ndarray):
+        A 4-element array containing the first quaternion (q01, q11, q21, q31).
+    q2 (np.ndarray):
+        A 4-element array containing the second quaternion (q02, q12, q22, q32).
 
-    Returns:
-        np.ndarray: A 4-element array containing the final quaternion (q03, q13, q23, q33).
+    Returns
+    --------
+    np.ndarray:
+        A 4-element array containing the final quaternion (q03, q13, q23, q33).
     """
     q1_w, q1_x, q1_y, q1_z = q1
     q2_w, q2_x, q2_y, q2_z = q2
@@ -129,10 +169,25 @@ def quaternion_multiply(q1, q2):
     return normalize(final_quaternion)
 
 
-@jax.jit
 def transform_vector(pdt0F_G: np.ndarray, u_F: np.ndarray):
+    """
+    Transforms a vector using a given pose transformation.
+
+    Parameters
+    ----------
+    pdt0F_G : np.ndarray
+        The pose transformation as a 4-element array, where the first element is
+        the scalar part (w) and the remaining three elements are the vector part
+        (v).
+    u_F : np.ndarray
+        The vector to be transformed as a 3-element array.
+
+    Returns
+    -------
+    jnp.ndarray
+        The transformed vector as a 3-element array.
+    """
     w, v = jnp.split(pdt0F_G, [1])
-    # w = w[0]
 
     uF_G = (
         (w**2 * u_F)
@@ -145,31 +200,46 @@ def transform_vector(pdt0F_G: np.ndarray, u_F: np.ndarray):
 
 @register_pytree_node_class
 class SpatialPose(object):
+    """
+    Represents a spatial pose with a reference location and orientation.
 
-    # reference location expressed in self
-    r: np.ndarray
-    # reference orientation as quaternion
-    q: np.ndarray
+    Attributes
+    ----------
+    r : np.ndarray
+        Reference location expressed in self.
+    q : np.ndarray
+        Reference orientation as a quaternion.
+    """
 
     def __init__(self, r: np.ndarray, q: np.ndarray):
+        """
+        Initializes a SpatialPose instance.
+
+        Parameters
+        ----------
+        r : np.ndarray
+            Reference location.
+        q : np.ndarray
+            Reference orientation as a quaternion.
+        """
         self.r = r
         self.q = q
 
     def __matmul__(self, other):
-        """Return a SpatialPose that describes other (P) in self (S)
-
-        self = p_BC
-        other = p_AB
-        new = p_AC = p_BC @ p_AB
+        """
+        Combines this pose with another pose using quaternion multiplication.
 
         Parameters
         ----------
-        other : _type_
-            _description_
-        """
+        other : SpatialPose
+            The other pose to combine with.
 
+        Returns
+        -------
+        SpatialPose
+            The resulting combined pose.
+        """
         new_q = quaternion_multiply(other.q, self.q)
-        # transforms from P -> S
         self_r_in_other = transform_vector(other.inv().q, self.r)
         new_r_in_self = self_r_in_other + other.r
         new_pose = SpatialPose(new_r_in_self, new_q)
@@ -177,45 +247,92 @@ class SpatialPose(object):
         return new_pose
 
     def inv(self):
+        """
+        Computes the inverse of this pose.
+
+        Returns
+        -------
+        SpatialPose
+            The inverse pose.
+        """
         q_inv = quaternion_inverse(self.q)
         p_inv = SpatialPose(-transform_vector(self.q, self.r), q_inv)
         return p_inv
 
     def __repr__(self) -> str:
+        """
+        Returns a string representation of the pose.
+
+        Returns
+        -------
+        str
+            String representation of the pose.
+        """
         return f"r({self.r}), q({self.q})"
 
     def tree_flatten(self):
+        """
+        Flattens the pose for JAX tree operations.
+
+        Returns
+        -------
+        tuple
+            Flattened pose.
+        """
         return ((self.r, self.q), None)
 
     @classmethod
     def tree_unflatten(cls, aux_data, args):
+        """
+        Unflattens the pose for JAX tree operations.
+
+        Parameters
+        ----------
+        aux_data : None
+            Auxiliary data (not used).
+        args : tuple
+            Flattened pose data.
+
+        Returns
+        -------
+        SpatialPose
+            The unflattened pose.
+        """
         return cls(*args)
 
     @staticmethod
     def Identity() -> SpatialPose:
+        """
+        Creates an identity pose.
+
+        Returns
+        -------
+        SpatialPose
+            The identity pose.
+        """
         return SpatialPose(np.zeros(3), np.array([1, 0, 0, 0]))
-
-
-@register_pytree_node_class
-class SpatialScrew(object):
-
-    r: np.ndarray
-    w: np.ndarray
-
-    def __init__(self, r: np.ndarray, w: np.ndarray):
-        self.r = r
-        self.w = w
-
-    def tree_flatten(self):
-        return ((self.r, self.w), None)
-
-    @classmethod
-    def tree_unflatten(cls, aux_data, args):
-        return cls(*args)
 
 
 @jax.jit
 def transform_screw(pose: SpatialPose, screw: np.ndarray) -> np.ndarray:
+    """Transforms a screw vector to a new coordinate frame defined by the given
+    pose.
+
+    Parameters
+    ----------
+    pose : SpatialPose
+        The pose defining the new coordinate frame, including position and
+        orientation.
+    screw : np.ndarray
+        The screw vector as a 6-element array, where the first three elements
+        are the linear velocity and the last three elements are the angular
+        velocity.
+
+    Returns
+    -------
+    np.ndarray
+        The transformed screw vector as a 6-element array.
+    """
     v, w = jnp.split(screw, 2)
     new_w = transform_vector(pose.q, w)
     new_v = transform_vector(pose.q, v + (skew_M @ pose.r) @ w)
@@ -225,6 +342,24 @@ def transform_screw(pose: SpatialPose, screw: np.ndarray) -> np.ndarray:
 
 @jax.jit
 def transform_screw_force(pose: SpatialPose, screw: np.ndarray) -> np.ndarray:
+    """Transforms a screw force-vector to a new coordinate frame defined by the
+    given pose.
+
+    Parameters
+    ----------
+    pose : SpatialPose
+        The pose defining the new coordinate frame, including position and
+        orientation.
+    screw : np.ndarray
+        The screw vector as a 6-element array, where the first three elements
+        are the linear velocity and the last three elements are the angular
+        velocity.
+
+    Returns
+    -------
+    np.ndarray
+        The transformed screw vector as a 6-element array.
+    """
     force, torque = jnp.split(screw, 2)
     new_w = transform_vector(pose.q, torque) + transform_vector(
         pose.q, ((skew_M @ pose.r) @ force)
@@ -237,6 +372,21 @@ def transform_screw_force(pose: SpatialPose, screw: np.ndarray) -> np.ndarray:
 
 @jax.jit
 def express_screw(pose: SpatialPose, screw: np.ndarray) -> np.ndarray:
+    """Express a screw vector in a new coordinate frame defined by the given pose.
+
+    Parameters
+    ----------
+    pose : SpatialPose
+        The pose defining the new coordinate frame, including position and orientation.
+    screw : np.ndarray
+        The screw vector as a 6-element array, where the first three elements are the linear velocity
+        and the last three elements are the angular velocity.
+
+    Returns
+    -------
+    np.ndarray
+        The transformed screw vector as a 6-element array.
+    """
     v, w = jnp.split(screw, 2)
     new_w = transform_vector(pose.q, w)
     new_v = transform_vector(pose.q, v)
@@ -318,6 +468,20 @@ def dcm_to_quaternion(dcm):
 
 @jax.jit
 def quaternion_from_axis_angle(angle: float, axis: np.ndarray):
+    """Converts an axis-angle representation to a quaternion.
+
+    Parameters
+    ----------
+    angle : float
+        The rotation angle in radians.
+    axis : np.ndarray
+        The rotation axis as a 3-element array.
+
+    Returns
+    -------
+    jnp.ndarray
+        The resulting quaternion as a 4-element array.
+    """
     axis = normalize(axis)
     c = jnp.cos(0.5 * angle)
     s = jnp.sin(0.5 * angle)
@@ -326,6 +490,18 @@ def quaternion_from_axis_angle(angle: float, axis: np.ndarray):
 
 @jax.jit
 def quaternion_inverse(q: np.ndarray):
+    """Computes the inverse of a quaternion.
+
+    Parameters
+    ----------
+    q : np.ndarray
+        The quaternion as a 4-element array.
+
+    Returns
+    -------
+    jnp.ndarray
+        The inverse of the quaternion as a 4-element array.
+    """
     return jnp.array([q[0], *(-q[1:])])
 
 
