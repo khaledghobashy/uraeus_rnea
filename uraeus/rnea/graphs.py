@@ -104,7 +104,7 @@ def accumulate_leaf_to_root(
     return partial(jax.jit(func, static_argnums=(2,)))
 
 
-def contstruct_traversal_orders(tree: Tree):
+def construct_traversal_orders(tree: Tree):
     nodes_indicies = {n: i for i, n in enumerate(tree.nodes)}
     base_to_tip = [
         (nodes_indicies[s], i, nodes_indicies[p]) for i, (p, s) in enumerate(tree.edges)
