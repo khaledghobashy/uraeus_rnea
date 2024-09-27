@@ -1,4 +1,4 @@
-from typing import NamedTuple, Callable, Tuple
+from typing import NamedTuple, Callable
 
 import jax
 
@@ -6,35 +6,22 @@ import jax.numpy as jnp
 import numpy as np
 
 
-def construct_motion_jacobians(
-    pose_polynomials: Callable[[np.ndarray], np.ndarray]
-) -> Tuple[
-    Callable[[np.ndarray], np.ndarray], Callable[[np.ndarray, np.ndarray], np.ndarray]
-]:
-    """_summary_
+class MotionEquations(NamedTuple):
+    """
+    Represents the motion equations for a joint.
 
-    Parameters
+    Attributes
     ----------
+    nj : int
+        Number of joints.
     pose_polynomials : Callable[[np.ndarray], np.ndarray]
-        _description_
-
-    Returns
-    -------
-    Tuple[ Callable[[np.ndarray], np.ndarray], Callable[[np.ndarray, np.ndarray], np.ndarray] ]
-        _description_
+        Function to compute pose polynomials.
+    pose_jacobian_dt0 : Callable[[np.ndarray], np.ndarray]
+        Function to compute the pose Jacobian at time t0.
+    pose_jacobian_dt1 : Callable[[np.ndarray, np.ndarray], np.ndarray]
+        Function to compute the pose Jacobian at time t1.
     """
 
-    pose_jacobian_dt0 = jax.jit(jax.jacfwd(pose_polynomials))
-
-    def pose_jacobian_dt0_mul_qdt1(qd0, qd1):
-        return pose_jacobian_dt0(qd0) @ qd1
-
-    pose_jacobian_dt1 = jax.jit(jax.jacfwd(pose_jacobian_dt0_mul_qdt1))
-
-    return pose_jacobian_dt0, pose_jacobian_dt1
-
-
-class MotionEquations(NamedTuple):
     nj: int
     pose_polynomials: Callable[[np.ndarray], np.ndarray]
     pose_jacobian_dt0: Callable[[np.ndarray], np.ndarray]
@@ -42,6 +29,10 @@ class MotionEquations(NamedTuple):
 
 
 class MotionEquationsMeta(type):
+    """
+    Metaclass for motion equations, ensuring required fields are implemented.
+    """
+
     _required_fields = {
         "nj",
         "pose_polynomials",
@@ -63,27 +54,78 @@ class MotionEquationsMeta(type):
 
 
 class AbstractMotionEquations(object, metaclass=MotionEquationsMeta):
+    """
+    Abstract base class for motion equations.
+    """
+
     nj: int
 
     @staticmethod
-    def pose_polynomials(qd0: np.ndarray) -> np.ndarray:
+    def pose_polynomials(qdt0: np.ndarray) -> np.ndarray:
+        """
+        Computes pose polynomials.
+
+        Parameters
+        ----------
+        qdt0 : np.ndarray
+            Joint coordinates.
+
+        Returns
+        -------
+        np.ndarray
+            Pose polynomials.
+        """
         pass
 
     @staticmethod
-    def pose_jacobian_dt0(qd0: np.ndarray) -> np.ndarray:
+    def pose_jacobian_dt0(qdt0: np.ndarray) -> np.ndarray:
+        """
+        Computes the pose Jacobian at pose qdt0.
+
+        Parameters
+        ----------
+        qdt0 : np.ndarray
+            Joint coordinates.
+
+        Returns
+        -------
+        np.ndarray
+            Pose Jacobian at pose qdt0.
+        """
+
         pass
 
     @staticmethod
-    def pose_jacobian_dt1(qd0: np.ndarray, qd1: np.ndarray) -> np.ndarray:
+    def pose_jacobian_dt1(qdt0: np.ndarray, qdt1: np.ndarray) -> np.ndarray:
+        """
+        Computes the pose Jacobian derivative at Joint pose, qdt0, and velocity
+        qdt1.
+
+        Parameters
+        ----------
+        qdt0 : np.ndarray
+            Joint coordinates.
+        qdt1 : np.ndarray
+            Rate of change of qdt0, qdt1.
+
+        Returns
+        -------
+        np.ndarray
+            Pose Jacobian derivative.
+        """
         pass
 
 
 class RevolutePolynomials(AbstractMotionEquations):
+    """
+    Motion equations for a revolute joint.
+    """
+
     nj = 1
 
     @staticmethod
-    def pose_polynomials(qd0: np.ndarray):
-        psi = qd0[0]
+    def pose_polynomials(qdt0: np.ndarray):
+        psi = qdt0[0]
         pose_states = jnp.array([0, 0, 0, 0, 0, psi])
         return pose_states
 
@@ -99,6 +141,10 @@ class RevolutePolynomials(AbstractMotionEquations):
 
 
 class TranslationalPolynomials(AbstractMotionEquations):
+    """
+    Motion equations for a translational joint.
+    """
+
     nj = 1
 
     @staticmethod
@@ -119,6 +165,10 @@ class TranslationalPolynomials(AbstractMotionEquations):
 
 
 class PlanarPolynomials(AbstractMotionEquations):
+    """
+    Motion equations for a Planar joint.
+    """
+
     nj = 3
 
     @staticmethod
@@ -148,6 +198,10 @@ class PlanarPolynomials(AbstractMotionEquations):
 
 
 class FreePolynomials(AbstractMotionEquations):
+    """
+    Motion equations for a Free joint.
+    """
+
     nj = 6
 
     @staticmethod
@@ -174,3 +228,35 @@ class FreePolynomials(AbstractMotionEquations):
     def pose_jacobian_dt1(qdt0: np.ndarray, qdt1: np.ndarray):
         pose_states_jacobian_dt1 = np.zeros((6, 6))
         return pose_states_jacobian_dt1
+
+
+def construct_motion_jacobians(
+    pose_polynomials: Callable[[np.ndarray], np.ndarray]
+) -> tuple[
+    Callable[[np.ndarray], np.ndarray], Callable[[np.ndarray, np.ndarray], np.ndarray]
+]:
+    """
+    Constructs the Jacobians for motion equations based on pose polynomials.
+
+    Parameters
+    ----------
+    pose_polynomials : Callable[[np.ndarray], np.ndarray]
+        Function to compute pose polynomials.
+
+    Returns
+    -------
+    tuple
+        A tuple containing two functions:
+        - pose_jacobian_dt0: Callable[[np.ndarray], np.ndarray]
+          Function to compute the pose Jacobian.
+        - pose_jacobian_dt1: Callable[[np.ndarray, np.ndarray], np.ndarray]
+          Function to compute the pose Jacobian derivative.
+    """
+    pose_jacobian_dt0 = jax.jit(jax.jacfwd(pose_polynomials))
+
+    def pose_jacobian_dt0_mul_qdt1(qd0, qd1):
+        return pose_jacobian_dt0(qd0) @ qd1
+
+    pose_jacobian_dt1 = jax.jit(jax.jacfwd(pose_jacobian_dt0_mul_qdt1))
+
+    return pose_jacobian_dt0, pose_jacobian_dt1

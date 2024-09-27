@@ -28,6 +28,21 @@ from uraeus.rnea.quaternion.motion_equations import (
 
 
 class MobilizerKinematics(NamedTuple):
+    """
+    Represents the kinematics of a mobilizer.
+
+    Attributes
+    ----------
+    p_FM : SpatialPose
+        The pose of the mobilizer.
+    S_FM : np.ndarray
+        The screw matrix of the mobilizer.
+    v_J : np.ndarray
+        The joint velocity.
+    a_J : np.ndarray
+        The joint acceleration.
+    """
+
     p_FM: SpatialPose
     S_FM: np.ndarray
     v_J: np.ndarray
@@ -35,6 +50,23 @@ class MobilizerKinematics(NamedTuple):
 
 
 class MobilizerForces(NamedTuple):
+    """
+    Represents the forces acting at a mobilizer.
+
+    Attributes
+    ----------
+    fi_S : np.ndarray
+        Internal force in the mobilizer, in the (S)uccessor frame.
+    fc_S : np.ndarray
+        Constraint force in the mobilizer, in the (S)uccessor frame.
+    fa_S : np.ndarray
+        Applied force in the mobilizer, in the (S)uccessor frame.
+    fc_G : np.ndarray
+        Constraint force, in the (G)lobal frame.
+    tau : np.ndarray
+        Generalized forces at the mobilizer.
+    """
+
     fi_S: np.ndarray
     fc_S: np.ndarray
     fa_S: np.ndarray

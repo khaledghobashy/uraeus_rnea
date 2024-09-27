@@ -26,6 +26,7 @@ from uraeus.rnea.quaternion.graphs import (
     accumulate_root_to_leaf,
 )
 
+# type definition fro repetitive type-hints
 SystemForces = list[tuple[list[np.ndarray], list[np.ndarray]]]
 
 
@@ -33,6 +34,21 @@ SystemForces = list[tuple[list[np.ndarray], list[np.ndarray]]]
 def eval_joints_kinematics(
     joints: tuple[FunctionalJoint, ...], coordinates: tuple[tuple[np.ndarray, ...], ...]
 ):
+    """
+    Evaluates the kinematics of a set of joints given their coordinates.
+
+    Parameters
+    ----------
+    joints : tuple of FunctionalJoint
+        A tuple containing the joints to evaluate.
+    coordinates : tuple of tuple of np.ndarray
+        A tuple containing the coordinates for each joint.
+
+    Returns
+    -------
+    tuple
+        A tuple containing the evaluated kinematics for each joint.
+    """
     new_kin = tuple(
         j.evaluate_kinematics(*coords) for j, coords in zip(joints, coordinates)
     )
@@ -44,6 +60,24 @@ def edge_force_func(
     transforms: list[np.ndarray],
     out_forces: list[np.ndarray],
 ):
+    """
+    Computes the resultant force at an edge/joint by transforming and summing
+    the output forces.
+
+    Parameters
+    ----------
+    successor_force : np.ndarray
+        The force applied by the successor as a 6-element array.
+    transforms : list of np.ndarray
+        A list of transformation matrices.
+    out_forces : list of np.ndarray
+        A list of output forces to be transformed and summed.
+
+    Returns
+    -------
+    np.ndarray
+        The resultant force as a 6-element array.
+    """
     out_forces_S = sum(
         map(transform_screw_force, transforms, out_forces), np.zeros((6,))
     )
