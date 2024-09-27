@@ -26,6 +26,8 @@ from uraeus.rnea.quaternion.graphs import (
     accumulate_root_to_leaf,
 )
 
+SystemForces = list[tuple[list[np.ndarray], list[np.ndarray]]]
+
 
 @partial(jax.jit, static_argnums=(0,))
 def eval_joints_kinematics(
@@ -74,7 +76,7 @@ def tip_to_base(
     traversal_order: list[tuple[int, list[int]]],
     bodies_kinematics: list[BodyKinematics],
     bodies_inertias: list[np.ndarray],
-    external_forces: list[list[np.ndarray]],
+    external_forces: SystemForces,
 ) -> list[np.ndarray]:
     # Evaluate inertia forces and external forces on bodies
     bodies_forces = list(
@@ -136,7 +138,7 @@ def extract_mobilizer_forces(
 def eval_bodies_forces(
     bodies_kinematics: list[BodyKinematics],
     bodies_inertias: list[np.ndarray],
-    external_forces: list[list[np.ndarray]],
+    external_forces: SystemForces,
 ):
     forces = list(
         map(

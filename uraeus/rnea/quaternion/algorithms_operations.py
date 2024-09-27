@@ -83,7 +83,7 @@ def screw_cross(v1: np.ndarray, v2: np.ndarray) -> np.ndarray:
 def evaluate_joint_inertia_force(
     successor_kin: BodyKinematics,
     successor_I: np.ndarray,
-    external_forces: List[np.ndarray],
+    external_forces: tuple[list[np.ndarray], list[np.ndarray]],
 ) -> np.ndarray:
 
     # inertia forces from direct accelerations
@@ -96,7 +96,14 @@ def evaluate_joint_inertia_force(
     # Total inertia forces
     fi_S = fi_S_qdt2 + fi_S_qdt1
 
-    fe_S = express_screw(successor_kin.p_GB, sum(external_forces, np.zeros((6,))))
+    global_external_forces, local_external_forces = external_forces
+
+    g_fe_S = express_screw(
+        successor_kin.p_GB, sum(global_external_forces, np.zeros((6,)))
+    )
+    l_fe_S = sum(local_external_forces, np.zeros((6,)))
+
+    fe_S = g_fe_S + l_fe_S
     fb_S = fi_S - fe_S
     return fb_S
 
