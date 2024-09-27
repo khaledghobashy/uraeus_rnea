@@ -1,5 +1,5 @@
 from functools import reduce
-from typing import Dict, List, NamedTuple, Tuple, Iterable
+from typing import Dict, List, NamedTuple, Tuple, Callable
 
 import numpy as np
 
@@ -232,3 +232,14 @@ class Model(object):
         ]
         qdt2 = forward_dynamics_call(self.tree_data, forces, qdt0, qdt1, tau)
         return qdt2
+
+    def ssode(
+        self,
+        t: float,
+        ydt0: np.ndarray,
+        forces_func: Callable,
+    ):
+        qdt0, qdt1 = ydt0.reshape(2, -1)
+        gen_forces = forces_func(self, qdt0, qdt1, 0 * qdt1, t)
+        qdt2 = self.forward_dynamics_pass(qdt0, qdt1, gen_forces)
+        return np.hstack([qdt1, qdt2])
