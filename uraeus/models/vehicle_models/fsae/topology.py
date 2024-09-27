@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import NamedTuple
 import numpy as np
-from uraeus.rnea.bodies import RigidBody, RigidBodyData
-from uraeus.rnea.joints import (
+from uraeus.rnea.quaternion.bodies import RigidBodyData
+from uraeus.rnea.quaternion.joints import (
     FreeJoint,
     JointData,
     JointConfigInputs,
@@ -10,7 +10,7 @@ from uraeus.rnea.joints import (
     TranslationalJoint,
 )
 
-from uraeus.rnea.topologies import MultiBodyTree
+from uraeus.rnea.quaternion.topologies import MultiBodyTree
 
 from .utils import RightSuspensionJoint, LeftSuspensionJoint
 
@@ -87,7 +87,7 @@ def construct_bodies_data(vehicle_data: VehicleData) -> BodiesData:
                 chassis.cg_height,
             ]
         ),
-        orientation=np.eye(3),
+        orientation=np.array([1, 0, 0, 0]),
         mass=chassis.mass,
         inertia_tensor=chassis.inertia_tensor,
     )
@@ -100,7 +100,7 @@ def construct_bodies_data(vehicle_data: VehicleData) -> BodiesData:
                 wheels_front.wc_height,
             ]
         ),
-        orientation=np.eye(3),
+        orientation=np.array([1, 0, 0, 0]),
         mass=susp_front.mass,
         inertia_tensor=np.eye(3),
     )
@@ -113,7 +113,7 @@ def construct_bodies_data(vehicle_data: VehicleData) -> BodiesData:
                 wheels_front.wc_height,
             ]
         ),
-        orientation=np.eye(3),
+        orientation=np.array([1, 0, 0, 0]),
         mass=susp_front.mass,
         inertia_tensor=np.eye(3),
     )
@@ -126,7 +126,7 @@ def construct_bodies_data(vehicle_data: VehicleData) -> BodiesData:
                 wheels_rear.wc_height,
             ]
         ),
-        orientation=np.eye(3),
+        orientation=np.array([1, 0, 0, 0]),
         mass=susp_rear.mass,
         inertia_tensor=np.eye(3),
     )
@@ -139,7 +139,7 @@ def construct_bodies_data(vehicle_data: VehicleData) -> BodiesData:
                 wheels_rear.wc_height,
             ]
         ),
-        orientation=np.eye(3),
+        orientation=np.array([1, 0, 0, 0]),
         mass=susp_rear.mass,
         inertia_tensor=np.eye(3),
     )
@@ -152,7 +152,7 @@ def construct_bodies_data(vehicle_data: VehicleData) -> BodiesData:
                 wheels_front.wc_height,
             ]
         ),
-        orientation=np.eye(3),
+        orientation=np.array([1, 0, 0, 0]),
         mass=wheels_front.mass,
         inertia_tensor=wheels_front.inertia_tensor,
     )
@@ -165,7 +165,7 @@ def construct_bodies_data(vehicle_data: VehicleData) -> BodiesData:
                 wheels_front.wc_height,
             ]
         ),
-        orientation=np.eye(3),
+        orientation=np.array([1, 0, 0, 0]),
         mass=wheels_front.mass,
         inertia_tensor=wheels_front.inertia_tensor,
     )
@@ -178,7 +178,7 @@ def construct_bodies_data(vehicle_data: VehicleData) -> BodiesData:
                 wheels_rear.wc_height,
             ]
         ),
-        orientation=np.eye(3),
+        orientation=np.array([1, 0, 0, 0]),
         mass=wheels_rear.mass,
         inertia_tensor=wheels_rear.inertia_tensor,
     )
@@ -191,7 +191,7 @@ def construct_bodies_data(vehicle_data: VehicleData) -> BodiesData:
                 wheels_rear.wc_height,
             ]
         ),
-        orientation=np.eye(3),
+        orientation=np.array([1, 0, 0, 0]),
         mass=wheels_rear.mass,
         inertia_tensor=wheels_rear.inertia_tensor,
     )
@@ -227,7 +227,7 @@ def construct_joints_data(vehicle_data: VehicleData) -> JointsData:
             ]
         ),
         z_axis=np.array([0, 0, 1]),
-        x_axis=np.array([1, 0, 0]),
+        x_axis=None,
     )
 
     fr_susp = JointConfigInputs(
@@ -307,6 +307,10 @@ def construct_multibodytree(vehicle_data: VehicleData) -> MultiBodyTree:
 
     tree = MultiBodyTree("vehicle")
 
+    # tree = emulate_free_joint(
+    #     tree, "ground", "chassis", bodies_data.chassis, joints_data.free
+    # )
+
     tree.add_joint(
         joint_name="free_joint",
         predecessor="ground",
@@ -315,8 +319,6 @@ def construct_multibodytree(vehicle_data: VehicleData) -> MultiBodyTree:
         joint_type=FreeJoint,
         joint_data=joints_data.free,
     )
-
-    # tree = emulate_free_joint(tree, "ground", "chassis", bodies_data.chassis)
 
     tree.add_joint(
         joint_name="fr_susp",
@@ -394,51 +396,28 @@ def construct_multibodytree(vehicle_data: VehicleData) -> MultiBodyTree:
 
 
 def emulate_free_joint(
-    model: MultiBodyTree, predecessor: str, successor: str, succ_data: RigidBodyData
+    model: MultiBodyTree,
+    predecessor: str,
+    successor: str,
+    succ_data: RigidBodyData,
+    joint_config: JointConfigInputs,
 ) -> MultiBodyTree:
     dummy_body_data = RigidBodyData()
 
     x_axis_config = JointConfigInputs(
-        pos=np.zeros((3,)), z_axis=np.array([1, 0, 0]), x_axis=None
+        pos=joint_config.pos, z_axis=np.array([1, 0, 0]), x_axis=None
     )
     y_axis_config = JointConfigInputs(
-        pos=np.zeros((3,)), z_axis=np.array([0, 1, 0]), x_axis=None
+        pos=joint_config.pos, z_axis=np.array([0, 1, 0]), x_axis=None
     )
     z_axis_config = JointConfigInputs(
-        pos=np.zeros((3,)), z_axis=np.array([0, 0, 1]), x_axis=None
-    )
-
-    model.add_joint(
-        joint_name="x_rotation",
-        predecessor=predecessor,
-        successor="d1",
-        succ_data=dummy_body_data,
-        joint_type=RevoluteJoint,
-        joint_data=x_axis_config,
-    )
-
-    model.add_joint(
-        joint_name="y_rotation",
-        predecessor="d1",
-        successor="d2",
-        succ_data=dummy_body_data,
-        joint_type=RevoluteJoint,
-        joint_data=y_axis_config,
-    )
-
-    model.add_joint(
-        joint_name="z_rotation",
-        predecessor="d2",
-        successor="d3",
-        succ_data=dummy_body_data,
-        joint_type=RevoluteJoint,
-        joint_data=z_axis_config,
+        pos=joint_config.pos, z_axis=np.array([0, 0, 1]), x_axis=None
     )
 
     model.add_joint(
         joint_name="x_trans",
-        predecessor="d3",
-        successor="d4",
+        predecessor=predecessor,
+        successor="d1",
         succ_data=dummy_body_data,
         joint_type=TranslationalJoint,
         joint_data=x_axis_config,
@@ -446,8 +425,8 @@ def emulate_free_joint(
 
     model.add_joint(
         joint_name="y_trans",
-        predecessor="d4",
-        successor="d5",
+        predecessor="d1",
+        successor="d2",
         succ_data=dummy_body_data,
         joint_type=TranslationalJoint,
         joint_data=y_axis_config,
@@ -455,10 +434,37 @@ def emulate_free_joint(
 
     model.add_joint(
         joint_name="z_trans",
-        predecessor="d5",
-        successor=successor,
+        predecessor="d2",
+        successor="d3",
         succ_data=succ_data,
         joint_type=TranslationalJoint,
+        joint_data=z_axis_config,
+    )
+
+    model.add_joint(
+        joint_name="x_rotation",
+        predecessor="d3",
+        successor="d4",
+        succ_data=dummy_body_data,
+        joint_type=RevoluteJoint,
+        joint_data=x_axis_config,
+    )
+
+    model.add_joint(
+        joint_name="y_rotation",
+        predecessor="d4",
+        successor="d5",
+        succ_data=dummy_body_data,
+        joint_type=RevoluteJoint,
+        joint_data=y_axis_config,
+    )
+
+    model.add_joint(
+        joint_name="z_rotation",
+        predecessor="d5",
+        successor=successor,
+        succ_data=dummy_body_data,
+        joint_type=RevoluteJoint,
         joint_data=z_axis_config,
     )
 
