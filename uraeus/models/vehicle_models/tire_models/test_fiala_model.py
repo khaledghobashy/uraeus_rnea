@@ -1,14 +1,14 @@
 from dataclasses import dataclass
 
 import numpy as np
-from uraeus.rnea.quaternion.bodies import RigidBodyData
-from uraeus.rnea.quaternion.joints import (
+from uraeus.rnea.bodies import RigidBodyData
+from uraeus.rnea.joints import (
     JointConfigInputs,
     TranslationalJoint,
     PlanarJoint,
     RevoluteJoint,
 )
-from uraeus.rnea.quaternion.topologies import MultiBodyTree, Model
+from uraeus.rnea.topologies import MultiBodyTree, Model
 from uraeus.models.vehicle_models.tire_models.fiala_model import (
     FialaTireModel,
     FialaTireParameters,

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from uraeus.rnea.quaternion.bodies import BodyKinematics
+from uraeus.rnea.bodies import BodyKinematics
 from uraeus.models.vehicle_models.tire_models.contact_point_method import (
     evaluate_transient_slips,
 )

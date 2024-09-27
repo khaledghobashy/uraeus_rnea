@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import NamedTuple
 import numpy as np
-from uraeus.rnea.quaternion.bodies import RigidBodyData
-from uraeus.rnea.quaternion.joints import (
+from uraeus.rnea.bodies import RigidBodyData
+from uraeus.rnea.joints import (
     FreeJoint,
     JointData,
     JointConfigInputs,
@@ -10,7 +10,7 @@ from uraeus.rnea.quaternion.joints import (
     TranslationalJoint,
 )
 
-from uraeus.rnea.quaternion.topologies import MultiBodyTree
+from uraeus.rnea.topologies import MultiBodyTree
 
 from .utils import RightSuspensionJoint, LeftSuspensionJoint
 

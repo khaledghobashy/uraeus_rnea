@@ -5,12 +5,12 @@ import numpy as np
 import scipy.integrate as integrate
 from scipy.optimize import fsolve
 
-from uraeus.rnea.quaternion.tree_traversals import base_to_tip, eval_joints_kinematics
-from uraeus.rnea.quaternion.algorithms import (
+from uraeus.rnea.tree_traversals import base_to_tip, eval_joints_kinematics
+from uraeus.rnea.algorithms import (
     split_coordinates,
     ext_forces_to_gen_forces,
 )
-from uraeus.rnea.quaternion.topologies import Model, construct_system_forces_from_dict
+from uraeus.rnea.topologies import Model, construct_system_forces_from_dict
 
 from .forces import evaluate_forces
 

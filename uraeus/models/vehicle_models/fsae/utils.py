@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from uraeus.rnea.quaternion.joints import construct_custom_joint
+from uraeus.rnea.joints import construct_custom_joint
 
 
 @jax.jit

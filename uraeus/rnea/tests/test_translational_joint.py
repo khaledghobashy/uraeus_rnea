@@ -4,10 +4,10 @@ import numpy as np
 import jax.numpy as jnp
 import jax
 
-from uraeus.rnea.quaternion.bodies import RigidBodyData
-from uraeus.rnea.quaternion.joints import JointConfigInputs, TranslationalJoint
-from uraeus.rnea.quaternion.topologies import MultiBodyTree, Model
-from uraeus.rnea.quaternion.tree_traversals import extract_mobilizer_forces
+from uraeus.rnea.bodies import RigidBodyData
+from uraeus.rnea.joints import JointConfigInputs, TranslationalJoint
+from uraeus.rnea.topologies import MultiBodyTree, Model
+from uraeus.rnea.tree_traversals import extract_mobilizer_forces
 
 
 def build_multibody_system_v01(

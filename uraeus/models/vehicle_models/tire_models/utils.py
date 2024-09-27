@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import numpy as np
 
-from uraeus.rnea.quaternion.bodies import BodyKinematics
+from uraeus.rnea.bodies import BodyKinematics
 
 
 @dataclass

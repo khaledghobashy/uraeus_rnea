@@ -1,15 +1,18 @@
-from typing import Tuple
+from __future__ import annotations
+import itertools
 
 import jax
-import numpy as np
+from jax.tree_util import register_pytree_node_class
 import jax.numpy as jnp
+import numpy as np
+
 
 jax.config.update("jax_enable_x64", True)
 jax.config.update("jax_traceback_filtering", "off")
 
 
 @jax.jit
-def vsplit(arr: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
+def vsplit(arr: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
     """Split an 2D array `arr` into two equally sized sections vertically.
     This mimics the `jnp.vspilt(arr, 2)`, but uses a smart `reshape` trick,
     avoiding expensive copy operations.
@@ -21,7 +24,7 @@ def vsplit(arr: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
 
     Returns
     -------
-    Tuple[jnp.ndarray, jnp.ndarray]
+    tuple[jnp.ndarray, jnp.ndarray]
         A tuple of the two
     """
     top_half, low_half = arr.reshape(2, -1, arr.shape[-1])
@@ -29,7 +32,7 @@ def vsplit(arr: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
 
 
 @jax.jit
-def hsplit(arr: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
+def hsplit(arr: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
     """Split an 2D array `arr` into two equally sized sections horizontally.
     This mimics the `jnp.hspilt(arr, 2)`, but uses a smart `.reshape` trick,
     avoiding expensive copy operations.
@@ -41,53 +44,53 @@ def hsplit(arr: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
 
     Returns
     -------
-    Tuple[jnp.ndarray, jnp.ndarray]
+    tuple[jnp.ndarray, jnp.ndarray]
         A tuple of the two
     """
     top_half, low_half = arr.T.reshape(2, -1, arr.shape[-1])
     return top_half.T, low_half.T
 
 
-@jax.jit
-def skew_matrix(v: jnp.ndarray) -> jnp.ndarray:
-    """Create a skew-matrix out of the given cartesian vector.
+def levi_cevita_tensor(len: int) -> np.ndarray:
+    """Transformation tensor that maps vectors into skew-symmetric
+    matrices
 
     Parameters
     ----------
-    v : np.ndarray
-        A (3,) numpy array representing a cartesian vector.
+    len : int
+        Vector length
 
     Returns
     -------
     np.ndarray
-        A (3, 3) np.array
+        Array with `len` dimensions
     """
-
-    x, y, z = v
-    mat = jnp.array([[0, -z, y], [z, 0, -x], [-y, x, 0]])
-    return mat
-
-
-@jax.jit
-def spatial_skew(v: jnp.ndarray) -> jnp.ndarray:
-    orient_elements, trans_elements = v.reshape(2, -1)
-
-    b00 = skew_matrix(orient_elements)
-    b01 = np.zeros((3, 3))
-    b10 = skew_matrix(trans_elements)
-    b11 = b00
-
-    result = jnp.vstack([jnp.hstack([b00, b01]), jnp.hstack([b10, b11])])
-    return result
+    arr = np.zeros(tuple([len for _ in range(len)]))
+    for x in itertools.permutations(tuple(range(len))):
+        mat = np.zeros((len, len), dtype=np.int32)
+        for i, j in zip(range(len), x):
+            mat[i, j] = 1
+        arr[x] = int(np.linalg.det(mat))
+    return arr
 
 
-@jax.jit
-def cross(v1: jnp.ndarray, v2: jnp.ndarray) -> jnp.ndarray:
-    return spatial_skew(v1) @ v2
+skew_M = levi_cevita_tensor(3)
 
 
 @jax.jit
 def rot_x(theta: float) -> jnp.ndarray:
+    """Generates a rotation matrix for a rotation around the x-axis.
+
+    Parameters
+    ----------
+    theta : float
+        The rotation angle in radians.
+
+    Returns
+    -------
+    jnp.ndarray
+        The 3x3 rotation matrix.
+    """
     c = jnp.cos(theta)
     s = jnp.sin(theta)
 
@@ -97,6 +100,18 @@ def rot_x(theta: float) -> jnp.ndarray:
 
 @jax.jit
 def rot_y(theta: float) -> jnp.ndarray:
+    """Generates a rotation matrix for a rotation around the y-axis.
+
+    Parameters
+    ----------
+    theta : float
+        The rotation angle in radians.
+
+    Returns
+    -------
+    jnp.ndarray
+        The 3x3 rotation matrix.
+    """
     c = jnp.cos(theta)
     s = jnp.sin(theta)
 
@@ -106,6 +121,18 @@ def rot_y(theta: float) -> jnp.ndarray:
 
 @jax.jit
 def rot_z(theta: float) -> jnp.ndarray:
+    """Generates a rotation matrix for a rotation around the z-axis.
+
+    Parameters
+    ----------
+    theta : float
+        The rotation angle in radians.
+
+    Returns
+    -------
+    jnp.ndarray
+        The 3x3 rotation matrix.
+    """
     c = jnp.cos(theta)
     s = jnp.sin(theta)
 
@@ -114,144 +141,436 @@ def rot_z(theta: float) -> jnp.ndarray:
 
 
 @jax.jit
-def spatial_motion_translation(p_PS: jnp.ndarray) -> jnp.ndarray:
-    X_PS = jnp.vstack(
-        [
-            jnp.hstack([np.eye(3), np.zeros((3, 3))]),
-            jnp.hstack([-skew_matrix(p_PS), np.eye(3)]),
-        ]
+def quaternion_multiply(q1, q2):
+    """Multiplies two quaternions.
+
+    Parameters
+    ----------
+    q1 (np.ndarray):
+        A 4-element array containing the first quaternion (q01, q11, q21, q31).
+    q2 (np.ndarray):
+        A 4-element array containing the second quaternion (q02, q12, q22, q32).
+
+    Returns
+    --------
+    np.ndarray:
+        A 4-element array containing the final quaternion (q03, q13, q23, q33).
+    """
+    q1_w, q1_x, q1_y, q1_z = q1
+    q2_w, q2_x, q2_y, q2_z = q2
+
+    t0 = q1_w * q2_w - q1_x * q2_x - q1_y * q2_y - q1_z * q2_z
+    t1 = q1_w * q2_x + q1_x * q2_w + q1_y * q2_z - q1_z * q2_y
+    t2 = q1_w * q2_y - q1_x * q2_z + q1_y * q2_w + q1_z * q2_x
+    t3 = q1_w * q2_z + q1_x * q2_y - q1_y * q2_x + q1_z * q2_w
+
+    final_quaternion = jnp.array([t0, t1, t2, t3])
+    return normalize(final_quaternion)
+
+
+def transform_vector(pdt0F_G: np.ndarray, u_F: np.ndarray):
+    """
+    Transforms a vector using a given pose transformation.
+
+    Parameters
+    ----------
+    pdt0F_G : np.ndarray
+        The pose transformation as a 4-element array, where the first element is
+        the scalar part (w) and the remaining three elements are the vector part
+        (v).
+    u_F : np.ndarray
+        The vector to be transformed as a 3-element array.
+
+    Returns
+    -------
+    jnp.ndarray
+        The transformed vector as a 3-element array.
+    """
+    w, v = jnp.split(pdt0F_G, [1])
+
+    uF_G = (
+        (w**2 * u_F)
+        + (2 * w * (skew_M @ v @ u_F))
+        + (2 * (v @ u_F) * v)
+        - ((v @ v) * u_F)
     )
-    return X_PS
+    return uF_G
+
+
+@register_pytree_node_class
+class SpatialPose(object):
+    """
+    Represents a spatial pose with a reference location and orientation.
+
+    Attributes
+    ----------
+    r : np.ndarray
+        Reference location expressed in self.
+    q : np.ndarray
+        Reference orientation as a quaternion.
+    """
+
+    def __init__(self, r: np.ndarray, q: np.ndarray):
+        """
+        Initializes a SpatialPose instance.
+
+        Parameters
+        ----------
+        r : np.ndarray
+            Reference location.
+        q : np.ndarray
+            Reference orientation as a quaternion.
+        """
+        self.r = r
+        self.q = q
+
+    def __matmul__(self, other):
+        """
+        Combines this pose with another pose using quaternion multiplication.
+
+        Parameters
+        ----------
+        other : SpatialPose
+            The other pose to combine with.
+
+        Returns
+        -------
+        SpatialPose
+            The resulting combined pose.
+        """
+        new_q = quaternion_multiply(other.q, self.q)
+        self_r_in_other = transform_vector(other.inv().q, self.r)
+        new_r_in_self = self_r_in_other + other.r
+        new_pose = SpatialPose(new_r_in_self, new_q)
+
+        return new_pose
+
+    def inv(self):
+        """
+        Computes the inverse of this pose.
+
+        Returns
+        -------
+        SpatialPose
+            The inverse pose.
+        """
+        q_inv = quaternion_inverse(self.q)
+        p_inv = SpatialPose(-transform_vector(self.q, self.r), q_inv)
+        return p_inv
+
+    def __repr__(self) -> str:
+        """
+        Returns a string representation of the pose.
+
+        Returns
+        -------
+        str
+            String representation of the pose.
+        """
+        return f"r({self.r}), q({self.q})"
+
+    def tree_flatten(self):
+        """
+        Flattens the pose for JAX tree operations.
+
+        Returns
+        -------
+        tuple
+            Flattened pose.
+        """
+        return ((self.r, self.q), None)
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, args):
+        """
+        Unflattens the pose for JAX tree operations.
+
+        Parameters
+        ----------
+        aux_data : None
+            Auxiliary data (not used).
+        args : tuple
+            Flattened pose data.
+
+        Returns
+        -------
+        SpatialPose
+            The unflattened pose.
+        """
+        return cls(*args)
+
+    @staticmethod
+    def Identity() -> SpatialPose:
+        """
+        Creates an identity pose.
+
+        Returns
+        -------
+        SpatialPose
+            The identity pose.
+        """
+        return SpatialPose(np.zeros(3), np.array([1, 0, 0, 0]))
 
 
 @jax.jit
-def spatial_motion_rotation(R_PS: jnp.ndarray) -> jnp.ndarray:
-    X_PS = jnp.vstack(
-        [
-            jnp.hstack([R_PS, np.zeros((3, 3))]),
-            jnp.hstack([np.zeros((3, 3)), R_PS]),
-        ]
+def transform_screw(pose: SpatialPose, screw: np.ndarray) -> np.ndarray:
+    """Transforms a screw vector to a new coordinate frame defined by the given
+    pose.
+
+    Parameters
+    ----------
+    pose : SpatialPose
+        The pose defining the new coordinate frame, including position and
+        orientation.
+    screw : np.ndarray
+        The screw vector as a 6-element array, where the first three elements
+        are the linear velocity and the last three elements are the angular
+        velocity.
+
+    Returns
+    -------
+    np.ndarray
+        The transformed screw vector as a 6-element array.
+    """
+    v, w = jnp.split(screw, 2)
+    new_w = transform_vector(pose.q, w)
+    new_v = transform_vector(pose.q, v + (skew_M @ pose.r) @ w)
+    new_screw = jnp.array([*new_v, *new_w])
+    return new_screw
+
+
+@jax.jit
+def transform_screw_force(pose: SpatialPose, screw: np.ndarray) -> np.ndarray:
+    """Transforms a screw force-vector to a new coordinate frame defined by the
+    given pose.
+
+    Parameters
+    ----------
+    pose : SpatialPose
+        The pose defining the new coordinate frame, including position and
+        orientation.
+    screw : np.ndarray
+        The screw vector as a 6-element array, where the first three elements
+        are the linear velocity and the last three elements are the angular
+        velocity.
+
+    Returns
+    -------
+    np.ndarray
+        The transformed screw vector as a 6-element array.
+    """
+    force, torque = jnp.split(screw, 2)
+    new_w = transform_vector(pose.q, torque) + transform_vector(
+        pose.q, ((skew_M @ pose.r) @ force)
     )
-    return X_PS
+    new_v = transform_vector(pose.q, force)
+
+    new_screw = jnp.array([*new_v, *new_w])
+    return new_screw
 
 
 @jax.jit
-def spatial_motion_transformation(R_PS: jnp.ndarray, p_PS: jnp.ndarray) -> jnp.ndarray:
-    X_PS = jnp.vstack(
-        [
-            jnp.hstack([R_PS, np.zeros((3, 3))]),
-            jnp.hstack([-R_PS @ skew_matrix(p_PS), R_PS]),
-        ]
-    )
-    return X_PS
+def express_screw(pose: SpatialPose, screw: np.ndarray) -> np.ndarray:
+    """Express a screw vector in a new coordinate frame defined by the given pose.
+
+    Parameters
+    ----------
+    pose : SpatialPose
+        The pose defining the new coordinate frame, including position and orientation.
+    screw : np.ndarray
+        The screw vector as a 6-element array, where the first three elements are the linear velocity
+        and the last three elements are the angular velocity.
+
+    Returns
+    -------
+    np.ndarray
+        The transformed screw vector as a 6-element array.
+    """
+    v, w = jnp.split(screw, 2)
+    new_w = transform_vector(pose.q, w)
+    new_v = transform_vector(pose.q, v)
+    new_screw = jnp.array([*new_v, *new_w])
+    return new_screw
 
 
 @jax.jit
-def spatial_force_transformation(R_PS: jnp.ndarray, p_PS: jnp.ndarray) -> jnp.ndarray:
-    X_PS = jnp.vstack(
-        [
-            jnp.hstack([R_PS, -R_PS @ skew_matrix(p_PS)]),
-            jnp.hstack([np.zeros((3, 3)), R_PS]),
-        ]
-    )
-    return X_PS
+def normalize(v):
+    return v / jnp.sqrt(v @ v)
+
+
+def euler_to_quaternion(roll, pitch, yaw):
+    """
+    Converts Euler angles (in radians) to a quaternion.
+
+    Args:
+        roll (float): Rotation around the x-axis (roll angle).
+        pitch (float): Rotation around the y-axis (pitch angle).
+        yaw (float): Rotation around the z-axis (yaw angle).
+
+    Returns:
+        np.ndarray: A 4-element array representing the quaternion (w, x, y, z).
+    """
+    cy = jnp.cos(yaw * 0.5)
+    sy = jnp.sin(yaw * 0.5)
+    cp = jnp.cos(pitch * 0.5)
+    sp = jnp.sin(pitch * 0.5)
+    cr = jnp.cos(roll * 0.5)
+    sr = jnp.sin(roll * 0.5)
+
+    qw = cr * cp * cy + sr * sp * sy
+    qx = sr * cp * cy - cr * sp * sy
+    qy = cr * sp * cy + sr * cp * sy
+    qz = cr * cp * sy - sr * sp * cy
+
+    return normalize(jnp.array([qw, qx, qy, qz]))
+
+
+def dcm_to_quaternion(dcm):
+    """
+    Converts a Direction Cosine Matrix (DCM) to a quaternion.
+
+    Args:
+        dcm (np.ndarray): A 3x3 rotation matrix.
+
+    Returns:
+        np.ndarray: A 4-element array representing the quaternion (w, x, y, z).
+    """
+    trace = jnp.trace(dcm)
+    if trace > 0:
+        S = 2 * jnp.sqrt(trace + 1)
+        qw = 0.25 * S
+        qx = (dcm[2, 1] - dcm[1, 2]) / S
+        qy = (dcm[0, 2] - dcm[2, 0]) / S
+        qz = (dcm[1, 0] - dcm[0, 1]) / S
+    elif dcm[0, 0] > dcm[1, 1] and dcm[0, 0] > dcm[2, 2]:
+        S = 2 * jnp.sqrt(1 + dcm[0, 0] - dcm[1, 1] - dcm[2, 2])
+        qw = (dcm[2, 1] - dcm[1, 2]) / S
+        qx = 0.25 * S
+        qy = (dcm[0, 1] + dcm[1, 0]) / S
+        qz = (dcm[0, 2] + dcm[2, 0]) / S
+    elif dcm[1, 1] > dcm[2, 2]:
+        S = 2 * jnp.sqrt(1 + dcm[1, 1] - dcm[0, 0] - dcm[2, 2])
+        qw = (dcm[0, 2] - dcm[2, 0]) / S
+        qx = (dcm[0, 1] + dcm[1, 0]) / S
+        qy = 0.25 * S
+        qz = (dcm[1, 2] + dcm[2, 1]) / S
+    else:
+        S = 2 * jnp.sqrt(1 + dcm[2, 2] - dcm[0, 0] - dcm[1, 1])
+        qw = (dcm[1, 0] - dcm[0, 1]) / S
+        qx = (dcm[0, 2] + dcm[2, 0]) / S
+        qy = (dcm[1, 2] + dcm[2, 1]) / S
+        qz = 0.25 * S
+
+    q = jnp.array([qw, qx, qy, qz])
+    return q / jnp.linalg.norm(q)
 
 
 @jax.jit
-def motion_to_force_transform(X_PS: jnp.ndarray) -> jnp.ndarray:
-    left_half, right_half = hsplit(X_PS)
-    b00, b10 = vsplit(left_half)
-    b01, b11 = vsplit(right_half)
+def quaternion_from_axis_angle(angle: float, axis: np.ndarray):
+    """Converts an axis-angle representation to a quaternion.
 
-    X_f_PS = jnp.vstack(
-        [
-            jnp.hstack([b00, b10]),
-            jnp.hstack([b01, b11]),
-        ]
-    )
+    Parameters
+    ----------
+    angle : float
+        The rotation angle in radians.
+    axis : np.ndarray
+        The rotation axis as a 3-element array.
 
-    return X_f_PS
-
-
-@jax.jit
-def spatial_transform_transpose(X_PS: jnp.ndarray) -> jnp.ndarray:
-    left_half, right_half = hsplit(X_PS)
-    b00, b10 = vsplit(left_half)
-    b01, b11 = vsplit(right_half)
-    X_SP = jnp.vstack(
-        [
-            jnp.hstack([b00.T, b01.T]),
-            jnp.hstack([b10.T, b11.T]),
-        ]
-    )
-
-    return X_SP
+    Returns
+    -------
+    jnp.ndarray
+        The resulting quaternion as a 4-element array.
+    """
+    axis = normalize(axis)
+    c = jnp.cos(0.5 * angle)
+    s = jnp.sin(0.5 * angle)
+    return jnp.array([c, *(s * axis)])
 
 
 @jax.jit
-def vector_from_skew(skew_m: jnp.ndarray) -> jnp.ndarray:
-    x = skew_m[2, 1]
-    y = skew_m[0, 2]
-    z = skew_m[1, 0]
+def quaternion_inverse(q: np.ndarray):
+    """Computes the inverse of a quaternion.
 
-    v = jnp.array([x, y, z])
+    Parameters
+    ----------
+    q : np.ndarray
+        The quaternion as a 4-element array.
 
-    return v
-
-
-@jax.jit
-def get_position_from_transformation(X_PS: jnp.ndarray) -> jnp.ndarray:
-    left_half, _ = hsplit(X_PS)
-    b00, b10 = vsplit(left_half)
-
-    skewed_matrix = b00.T @ b10
-    p_PS = vector_from_skew(-skewed_matrix)
-
-    return p_PS
+    Returns
+    -------
+    jnp.ndarray
+        The inverse of the quaternion as a 4-element array.
+    """
+    return jnp.array([q[0], *(-q[1:])])
 
 
 @jax.jit
-def get_euler_angles_from_rotation(R_PS: jnp.ndarray) -> jnp.ndarray:
-    r00, r01, r02 = R_PS[0, :]
-    r10, r11, r12 = R_PS[1, :]
-    r20, r21, r22 = R_PS[2, :]
+def E(p: np.ndarray) -> np.ndarray:
+    """A property matrix of euler parameters. Mostly used to transform between the
+    cartesian angular velocity of body and the euler-parameters time derivative
+    in the global coordinate system.
 
-    theta_x = jnp.arctan2(-r12, r22)
-    theta_y = jnp.arctan2(r02, jnp.sqrt(r12**2 + r22**2))
-    theta_z = jnp.arctan2(-r01, r00)
+    Parameters
+    ----------
+    p : np.ndarray
+        Euler parameters array of shape (4,)
 
-    euler_angles = jnp.array([theta_x, theta_y, theta_z])
+    Returns
+    -------
+    np.ndarray
+        E matrix of shape (3,4)
 
-    return euler_angles
-
-
-@jax.jit
-def get_euler_angles_from_transformation(X_PS: jnp.ndarray) -> jnp.ndarray:
-    left_half, _ = hsplit(X_PS)
-    b00, _ = vsplit(left_half)
-
-    e_PS = get_euler_angles_from_rotation(b00)
-
-    return b00
-
-
-@jax.jit
-def get_pose_from_transformation(X_PS: jnp.ndarray) -> jnp.ndarray:
-    left_half, _ = hsplit(X_PS)
-    b00, b10 = vsplit(left_half)
-
-    skewed_matrix = b00.T @ b10
-    p_PS = vector_from_skew(-skewed_matrix)
-    r_PS = -b00 @ p_PS
-
-    e_PS = get_euler_angles_from_rotation(b00)
-
-    return jnp.hstack([e_PS, r_PS])
+        m = np.array([
+            [-e1, e0,-e3, e2],
+            [-e2, e3, e0,-e1],
+            [-e3,-e2, e1, e0],
+            ])
+    """
+    e0, e = jnp.split(p, [1])
+    I = np.eye(3)
+    m = jnp.hstack((-e[:, None], (e0 * I) + skew_M @ e))
+    return m
 
 
 @jax.jit
-def get_orientation_matrix_from_transformation(X_PS: jnp.ndarray) -> jnp.ndarray:
-    left_half, _ = hsplit(X_PS)
-    R_PS, _ = vsplit(left_half)
+def G(p: np.ndarray) -> np.ndarray:
+    """A property matrix of euler parameters. Mostly used to transform between the
+    cartesian angular velocity of body and the euler-parameters time derivative
+    in the body coordinate system.
 
-    return R_PS
+    Note: This is half the G_bar given in Shabana's book
+
+    Parameters
+    ----------
+    p : np.ndarray
+        Euler parameters array of shape (4,)
+
+    Returns
+    -------
+    np.ndarray
+        G matrix of shape (3,4)
+    """
+    e0, e = jnp.split(p, [1])
+    I = np.eye(3)
+    m = jnp.hstack((-e[:, None], (e0 * I) - skew_M @ e))
+    return m
+
+
+@jax.jit
+def quaternion_to_dcm(p: np.ndarray) -> np.ndarray:
+    """Transformation matrix as a function of euler parameters
+    Note: The matrix is defined as a product of the two special matrices
+    of euler parameters, the E and G matrices. This function is faster.
+
+    Parameters
+    ----------
+    p : np.ndarray
+        Euler parameters array of shape (4,)
+
+    Returns
+    -------
+    np.ndarray
+        Transformation matrix of shape (3,3)
+    """
+    m = E(p) @ G(p).T
+    return m

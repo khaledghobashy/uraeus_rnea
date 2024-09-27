@@ -1,58 +1,69 @@
 from functools import partial
-from itertools import repeat
 from operator import sub
-from typing import Iterable, List, Dict, NamedTuple, Tuple
+from typing import Iterable, NamedTuple
 
 import jax
+
 import jax.numpy as jnp
 import numpy as np
 
 from uraeus.rnea.bodies import BodyKinematics
-from uraeus.rnea.joints import (
-    JointKinematics,
-)
+from uraeus.rnea.joints import JointKinematics, FunctionalJoint
 from uraeus.rnea.spatial_algebra import (
-    get_orientation_matrix_from_transformation,
-    motion_to_force_transform,
-    spatial_motion_rotation,
-    spatial_transform_transpose,
+    SpatialPose,
+    express_screw,
+    transform_screw,
 )
-from uraeus.rnea.topologies import HybridDynamicsData, MultiBodyData
+
 from uraeus.rnea.graphs import accumulate_root_to_leaf
 from uraeus.rnea.tree_traversals import (
     base_to_tip,
     tip_to_base,
     evaluate_tau,
     joints_forces_accumulator,
+    SystemForces,
 )
-
-
-# def split(arr: np.ndarray, idx: np.ndarray):
-#     res = [arr[i:j] for (i, j) in zip(idx[:-1], idx[1:])]
-#     return res
 
 
 @partial(jax.jit, static_argnums=(0,))
 def split_coordinates(
-    idx: Tuple[int], qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
-) -> Iterable[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    idx: tuple[int], qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
+) -> Iterable[tuple[np.ndarray, np.ndarray, np.ndarray]]:
     coordinates = tuple(
         (qdt0[i:j], qdt1[i:j], qdt2[i:j]) for (i, j) in zip(idx[:-1], idx[1:])
     )
     return coordinates
 
 
+class MultiBodyData(NamedTuple):
+    joints: tuple[FunctionalJoint]
+    bodies_inertias: list[np.ndarray]
+    forward_traversal: tuple[tuple[int, int, int], ...]
+    backward_traversal: list[tuple[int, list[int]]]
+    qdt0_idx: tuple[int]
+    qdt1_idx: tuple[int]
+
+    def __hash__(self):
+        return hash(self.__class__.__name__)
+
+
+class HybridDynamicsData(NamedTuple):
+    tree_data: MultiBodyData
+    permutation_matrix: np.ndarray
+    n_fd: int
+
+
 class IDCallRes(NamedTuple):
     tau: np.ndarray
-    bodies_kinematics: List[BodyKinematics]
-    joints_kinematics: List[JointKinematics]
-    joints_forces: List[np.ndarray]
+    bodies_kinematics: list[BodyKinematics]
+    joints_kinematics: list[JointKinematics]
+    joints_forces: list[np.ndarray]
 
 
 @partial(jax.jit, static_argnums=(0,))
 def inverse_dynamics_call(
     tree_data: MultiBodyData,
-    external_forces: List[List[np.ndarray]],
+    external_forces: SystemForces,
     qdt0: np.ndarray,
     qdt1: np.ndarray,
     qdt2: np.ndarray,
@@ -86,7 +97,7 @@ def inverse_dynamics_call(
 @partial(jax.jit, static_argnums=(0,))
 def evaluate_C(
     tree_data: MultiBodyData,
-    external_forces: List[List[np.ndarray]],
+    external_forces: SystemForces,
     qdt0: np.ndarray,
     qdt1: np.ndarray,
 ) -> IDCallRes:
@@ -98,14 +109,13 @@ def evaluate_C(
 @partial(jax.jit, static_argnums=(0,))
 def forward_dynamics_call(
     tree_data: MultiBodyData,
-    external_forces: List[List[np.ndarray]],
+    external_forces: SystemForces,
     qdt0: np.ndarray,
     qdt1: np.ndarray,
     tau: np.ndarray,
 ) -> np.ndarray:
     C, _, joints_kin, _ = evaluate_C(tree_data, external_forces, qdt0, qdt1)
     H = JointInertiaMatrixOperations.construct_H(tree_data, joints_kin, qdt0)
-
     rhs = tau - C
     qdt2 = jnp.linalg.solve(H, rhs)
     return qdt2
@@ -115,7 +125,7 @@ def forward_dynamics_call(
 def eval_successor_acc(
     predecessor_acc: np.ndarray, joint_kin: JointKinematics
 ) -> np.ndarray:
-    a_B = (joint_kin.X_SP @ predecessor_acc) + joint_kin.a_J
+    a_B = transform_screw(joint_kin.p_PS, predecessor_acc) + joint_kin.a_J
     return a_B
 
 
@@ -131,7 +141,7 @@ class JointInertiaMatrixOperations(NamedTuple):
     def construct_H(
         cls,
         tree_data: MultiBodyData,
-        joints_kin: List[JointKinematics],
+        joints_kin: list[JointKinematics],
         qdt0: np.ndarray,
     ):
         booleans = np.eye(len(qdt0))
@@ -146,15 +156,18 @@ class JointInertiaMatrixOperations(NamedTuple):
     @partial(jax.jit, static_argnums=(0,))
     def construct_new_acc(
         tree_data: MultiBodyData,
-        joints_kin: List[JointKinematics],
+        joints_kin: list[JointKinematics],
         qdt0: np.ndarray,
         qdt2: np.ndarray,
-    ) -> List[np.ndarray]:
+    ) -> list[np.ndarray]:
         coordinates = split_coordinates(
             tree_data.qdt0_idx, qdt0, jnp.zeros_like(qdt0), qdt2
         )
         a_J_mob = [j.mobilizer.a_J(*qs) for j, qs in zip(tree_data.joints, coordinates)]
-        a_J_jnt = [j.frames.X_SM @ a_J for j, a_J in zip(tree_data.joints, a_J_mob)]
+        a_J_jnt = [
+            transform_screw(j.frames.p_SM.inv(), a_J)
+            for j, a_J in zip(tree_data.joints, a_J_mob)
+        ]
         new_kin = [
             JointKinematics(*kin[:-1], a_J) for kin, a_J in zip(joints_kin, a_J_jnt)
         ]
@@ -164,14 +177,12 @@ class JointInertiaMatrixOperations(NamedTuple):
     @partial(jax.jit, static_argnums=(0,))
     def traverse(
         tree_data: MultiBodyData,
-        joints_kin: List[JointKinematics],
+        joints_kin: list[JointKinematics],
     ):
         forward_traversal = tree_data.forward_traversal
         backward_traversal = tree_data.backward_traversal
         joints_frames = tuple(j.frames for j in tree_data.joints)
-        forces_transforms = tuple(
-            motion_to_force_transform(j.X_PS) for j in reversed(joints_kin)
-        )
+        forces_transforms = tuple(j.p_SP for j in reversed(joints_kin))
 
         bodies_acc = node_acceleration_accumulator(forward_traversal, joints_kin)
         bodies_forces = tuple(map(jnp.dot, tree_data.bodies_inertias, bodies_acc))
@@ -188,7 +199,7 @@ class HybridDynamics(object):
     def evaluate_C(
         self,
         hybrid_data: HybridDynamicsData,
-        external_forces: List[List[np.ndarray]],
+        external_forces: SystemForces,
         qdt0: np.ndarray,
         qdt1: np.ndarray,
         qdt2_id: np.ndarray,
@@ -204,7 +215,7 @@ class HybridDynamics(object):
     def forward_dynamics_call(
         self,
         hybrid_data: HybridDynamicsData,
-        external_forces: List[List[np.ndarray]],
+        external_forces: SystemForces,
         qdt0: np.ndarray,
         qdt1: np.ndarray,
         qdt2_id: np.ndarray,
@@ -228,31 +239,31 @@ class HybridDynamics(object):
         return qdt2_fd
 
 
-def _helper(predecessor_X_GB, joint):
-    X_GB = predecessor_X_GB @ joint.X_PS
-    X_BG = spatial_transform_transpose(X_GB)
-    R_BG = get_orientation_matrix_from_transformation(X_BG)
-    E_BG = spatial_motion_rotation(R_BG)
-    return E_BG
+def _helper(predecessor_p_GB: SpatialPose, joint: JointKinematics):
+    p_GB = joint.p_PS @ predecessor_p_GB
+    return p_GB
 
 
-_bodies_config_func = accumulate_root_to_leaf(np.eye(6), _helper)
+_bodies_config_func = accumulate_root_to_leaf(
+    SpatialPose(np.array([0, 0, 0]), np.array([1, 0, 0, 0])), _helper
+)
 
 
 @partial(jax.jit, static_argnums=(0,))
 def ext_forces_to_gen_forces(
     tree_data: MultiBodyData,
-    joints_kin: Tuple[JointKinematics, ...],
-    ext_forces: Tuple[Tuple[np.ndarray, ...], ...],
+    joints_kin: tuple[JointKinematics, ...],
+    ext_forces: SystemForces,
 ):
-    bodies_E_BG = _bodies_config_func(tree_data.forward_traversal, joints_kin)
-    bodies_E_BG_f = map(motion_to_force_transform, bodies_E_BG)
-    bodies_fe_S = map(
-        jnp.dot, bodies_E_BG_f, [sum(forces, np.zeros((6,))) for forces in ext_forces]
+    bodies_p_GB = _bodies_config_func(tree_data.forward_traversal, joints_kin)
+    bodies_fe_S_g = map(
+        express_screw,
+        bodies_p_GB,
+        [sum(forces[0], jnp.zeros((6,))) for forces in ext_forces],
     )
-    forces_transforms = [
-        motion_to_force_transform(j.X_PS) for j in reversed(joints_kin)
-    ]
+    bodies_fe_S_l = [sum(forces[1], jnp.zeros((6,))) for forces in ext_forces]
+    bodies_fe_S = [f1 + f2 for f1, f2 in zip(bodies_fe_S_g, bodies_fe_S_l)]
+    forces_transforms = [(j.p_SP) for j in reversed(joints_kin)]
     joints_forces = list(
         reversed(
             joints_forces_accumulator(
@@ -265,71 +276,3 @@ def ext_forces_to_gen_forces(
 
     tau = evaluate_tau(joints_frames, joints_kin, joints_forces)
     return tau
-
-
-# =============================================================================
-# Obselete
-# =============================================================================
-# def evaluate_H(
-#     tree_data: MultiBodyData,
-#     external_forces: List[List[np.ndarray]],
-#     qdt0: np.ndarray,
-#     qdt1: np.ndarray,
-#     C_vec: np.ndarray,
-# ) -> np.ndarray:
-
-#     boolean_deltas = np.eye(len(qdt0))
-#     partial_func = partial(
-#         inverse_dynamics_call,
-#         tree_data,
-#         external_forces,
-#         qdt0,
-#         qdt1,
-#     )
-#     # H_columns = map(partial_func, boolean_deltas)
-#     # H_columns = map(sub, H_columns, repeat(C_vec, len(qdt0)))
-#     # H_matrix = np.column_stack(list(H_columns))
-
-#     H_columns = [
-#         (inverse_dynamics_call(tree_data, external_forces, qdt0, qdt1, col).tau - C_vec)
-#         for col in boolean_deltas
-#     ]
-#     H_matrix = np.column_stack(H_columns)
-
-#     return H_matrix
-
-
-# def evaluate_H2(
-#     tree_data: MultiBodyData,
-#     qdt0: np.ndarray,
-# ) -> np.ndarray:
-
-#     ext_forces = [[] for _ in qdt0]
-#     boolean_deltas = np.eye(len(qdt0))
-#     partial_func = partial(
-#         inverse_dynamics_call,
-#         tree_data,
-#         ext_forces,
-#         qdt0,
-#         np.zeros_like(qdt0),
-#     )
-#     H_columns = map(partial_func, boolean_deltas)
-#     H_matrix = np.column_stack(list(H_columns))
-
-#     return H_matrix
-
-
-# def forward_dynamics_call(
-#     tree_data: MultiBodyData,
-#     external_forces: List[List[np.ndarray]],
-#     qdt0: np.ndarray,
-#     qdt1: np.ndarray,
-#     tau: np.ndarray,
-# ) -> np.ndarray:
-
-#     C = evaluate_C(tree_data, external_forces, qdt0, qdt1)
-#     H = evaluate_H(tree_data, external_forces, qdt0, qdt1, C)
-
-#     rhs = tau - C
-#     qdt2 = np.linalg.solve(H, rhs)
-#     return qdt2

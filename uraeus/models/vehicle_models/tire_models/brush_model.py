@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from uraeus.utils.logging import construct_logger
-from uraeus.rnea.quaternion.bodies import BodyKinematics
+from uraeus.rnea.bodies import BodyKinematics
 from uraeus.models.vehicle_models.tire_models.utils import (
     TireKinematics,
     evaluate_tire_kinematics,
