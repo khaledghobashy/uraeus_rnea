@@ -52,6 +52,9 @@ class HybridDynamicsData(NamedTuple):
     permutation_matrix: np.ndarray
     n_fd: int
 
+    def __hash__(self):
+        return hash(self.__class__.__name__)
+
 
 class IDCallRes(NamedTuple):
     tau: np.ndarray
@@ -196,8 +199,9 @@ class JointInertiaMatrixOperations(NamedTuple):
 
 
 class HybridDynamics(object):
+    @staticmethod
+    @partial(jax.jit, static_argnums=(0,))
     def evaluate_C(
-        self,
         hybrid_data: HybridDynamicsData,
         external_forces: SystemForces,
         qdt0: np.ndarray,
@@ -206,14 +210,16 @@ class HybridDynamics(object):
     ) -> IDCallRes:
         n_fd = hybrid_data.n_fd
         Q = hybrid_data.permutation_matrix
-        qdt2 = Q.T @ np.hstack([np.zeros((n_fd,)), qdt2_id])
+        qdt2 = Q.T @ jnp.hstack([np.zeros((n_fd,)), qdt2_id])
 
         return inverse_dynamics_call(
             hybrid_data.tree_data, external_forces, qdt0, qdt1, qdt2
         )
 
+    @classmethod
+    @partial(jax.jit, static_argnums=(0, 1))
     def forward_dynamics_call(
-        self,
+        cls,
         hybrid_data: HybridDynamicsData,
         external_forces: SystemForces,
         qdt0: np.ndarray,
@@ -224,7 +230,7 @@ class HybridDynamics(object):
         n_fd = hybrid_data.n_fd
         Q = hybrid_data.permutation_matrix
 
-        C, _, joints_kin, _ = self.evaluate_C(
+        C, _, joints_kin, _ = cls.evaluate_C(
             hybrid_data, external_forces, qdt0, qdt1, qdt2_id
         )
         H = JointInertiaMatrixOperations.construct_H(
@@ -235,7 +241,7 @@ class HybridDynamics(object):
         C_fd = (Q @ C)[:n_fd]
 
         rhs = tau_fd - C_fd
-        qdt2_fd = np.linalg.solve(H_fd, rhs)
+        qdt2_fd = jnp.linalg.solve(H_fd, rhs)
         return qdt2_fd
 
 
