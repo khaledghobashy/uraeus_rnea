@@ -1,6 +1,6 @@
 from functools import partial
 from operator import sub
-from typing import Iterable, List, NamedTuple, Tuple
+from typing import Iterable, NamedTuple
 
 import jax
 
@@ -27,8 +27,8 @@ from uraeus.rnea.quaternion.tree_traversals import (
 
 @partial(jax.jit, static_argnums=(0,))
 def split_coordinates(
-    idx: Tuple[int], qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
-) -> Iterable[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    idx: tuple[int], qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
+) -> Iterable[tuple[np.ndarray, np.ndarray, np.ndarray]]:
     coordinates = tuple(
         (qdt0[i:j], qdt1[i:j], qdt2[i:j]) for (i, j) in zip(idx[:-1], idx[1:])
     )
@@ -36,12 +36,12 @@ def split_coordinates(
 
 
 class MultiBodyData(NamedTuple):
-    joints: Tuple[FunctionalJoint]
-    bodies_inertias: List[np.ndarray]
-    forward_traversal: Tuple[Tuple[int, int, int], ...]
-    backward_traversal: List[Tuple[int, List[int]]]
-    qdt0_idx: Tuple[int]
-    qdt1_idx: Tuple[int]
+    joints: tuple[FunctionalJoint]
+    bodies_inertias: list[np.ndarray]
+    forward_traversal: tuple[tuple[int, int, int], ...]
+    backward_traversal: list[tuple[int, list[int]]]
+    qdt0_idx: tuple[int]
+    qdt1_idx: tuple[int]
 
     def __hash__(self):
         return hash(self.__class__.__name__)
@@ -55,9 +55,9 @@ class HybridDynamicsData(NamedTuple):
 
 class IDCallRes(NamedTuple):
     tau: np.ndarray
-    bodies_kinematics: List[BodyKinematics]
-    joints_kinematics: List[JointKinematics]
-    joints_forces: List[np.ndarray]
+    bodies_kinematics: list[BodyKinematics]
+    joints_kinematics: list[JointKinematics]
+    joints_forces: list[np.ndarray]
 
 
 @partial(jax.jit, static_argnums=(0,))
@@ -141,7 +141,7 @@ class JointInertiaMatrixOperations(NamedTuple):
     def construct_H(
         cls,
         tree_data: MultiBodyData,
-        joints_kin: List[JointKinematics],
+        joints_kin: list[JointKinematics],
         qdt0: np.ndarray,
     ):
         booleans = np.eye(len(qdt0))
@@ -156,10 +156,10 @@ class JointInertiaMatrixOperations(NamedTuple):
     @partial(jax.jit, static_argnums=(0,))
     def construct_new_acc(
         tree_data: MultiBodyData,
-        joints_kin: List[JointKinematics],
+        joints_kin: list[JointKinematics],
         qdt0: np.ndarray,
         qdt2: np.ndarray,
-    ) -> List[np.ndarray]:
+    ) -> list[np.ndarray]:
         coordinates = split_coordinates(
             tree_data.qdt0_idx, qdt0, jnp.zeros_like(qdt0), qdt2
         )
@@ -177,7 +177,7 @@ class JointInertiaMatrixOperations(NamedTuple):
     @partial(jax.jit, static_argnums=(0,))
     def traverse(
         tree_data: MultiBodyData,
-        joints_kin: List[JointKinematics],
+        joints_kin: list[JointKinematics],
     ):
         forward_traversal = tree_data.forward_traversal
         backward_traversal = tree_data.backward_traversal
@@ -252,7 +252,7 @@ _bodies_config_func = accumulate_root_to_leaf(
 @partial(jax.jit, static_argnums=(0,))
 def ext_forces_to_gen_forces(
     tree_data: MultiBodyData,
-    joints_kin: Tuple[JointKinematics, ...],
+    joints_kin: tuple[JointKinematics, ...],
     ext_forces: SystemForces,
 ):
     bodies_p_GB = _bodies_config_func(tree_data.forward_traversal, joints_kin)

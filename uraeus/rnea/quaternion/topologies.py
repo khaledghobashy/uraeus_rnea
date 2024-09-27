@@ -1,5 +1,5 @@
 from functools import reduce
-from typing import Dict, List, NamedTuple, Tuple, Callable, Optional
+from typing import Callable
 
 import numpy as np
 
@@ -9,7 +9,6 @@ from uraeus.rnea.quaternion.graphs import Graph, Tree, construct_traversal_order
 
 from uraeus.rnea.quaternion.joints import (
     AbstractJoint,
-    FunctionalJoint,
     JointConfigInputs,
     JointInstance,
     construct_functional_joint,
@@ -27,14 +26,14 @@ from uraeus.rnea.quaternion.algorithms import (
     forward_dynamics_call,
 )
 
-ForcesDict = dict[str, dict[str, dict[str, np.ndarray]]]
+Forcesdict = dict[str, dict[str, dict[str, np.ndarray]]]
 
 
 class MultiBodyGraph(object):
     name: str
     graph: Graph
-    bodies: Dict[str, RigidBody]
-    joints: Dict[str, JointInstance]
+    bodies: dict[str, RigidBody]
+    joints: dict[str, JointInstance]
 
     def __init__(self, name: str):
         self.name = name
@@ -78,8 +77,8 @@ class MultiBodyGraph(object):
 class MultiBodyTree(object):
     name: str
     tree: Tree
-    bodies: Dict[str, RigidBody]
-    joints: Dict[str, JointInstance]
+    bodies: dict[str, RigidBody]
+    joints: dict[str, JointInstance]
 
     def __init__(self, name: str):
         self.name = name
@@ -133,7 +132,7 @@ class MultiBodyTree(object):
     def get_body(self, name: str) -> RigidBody:
         return self.bodies[name]
 
-    def construct_bodies_coordinates_names(self) -> List[str]:
+    def construct_bodies_coordinates_names(self) -> list[str]:
         coordinates = ["phi", "theta", "psi", "x", "y", "z"]
         namer = lambda l, name: l + [f"{name}.{c}" for c in coordinates]
         bodies_coordinates = reduce(namer, self.bodies.keys(), [])
@@ -143,7 +142,7 @@ class MultiBodyTree(object):
         return joint_name in self.joints
 
 
-def construct_permutation_matrix(dof: int, id_indices: List[int]) -> np.ndarray:
+def construct_permutation_matrix(dof: int, id_indices: list[int]) -> np.ndarray:
     permutation = [i for i in range(dof) if i not in id_indices]
     permutation += id_indices
     mat = np.zeros((dof, dof))
@@ -188,7 +187,7 @@ def construct_multibodydata(topology: MultiBodyTree) -> MultiBodyData:
 
 class Model(object):
     topology: MultiBodyTree
-    forces_map: ForcesDict
+    forces_map: Forcesdict
     tree_data: MultiBodyData
 
     def __init__(self, topology: MultiBodyTree):
@@ -203,13 +202,13 @@ class Model(object):
         self.bodies_idx = {b: i for i, b in enumerate(self.topology.tree.nodes)}
 
     def get_body_kinematics(
-        self, name: str, bodies_kinematics: List[BodyKinematics]
+        self, name: str, bodies_kinematics: list[BodyKinematics]
     ) -> BodyKinematics:
         return bodies_kinematics[self.bodies_idx[name]]
 
     def forward_kinematics_pass(
         self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
-    ) -> Tuple[BodyKinematics, JointKinematics]:
+    ) -> tuple[BodyKinematics, JointKinematics]:
         coordinates = split_coordinates(self.tree_data.qdt0_idx, qdt0, qdt1, qdt2)
 
         bodies_kinematics, joints_kinematics = base_to_tip(
@@ -249,7 +248,7 @@ def _convert_body_forces_dict_to_list(forces_dict: dict[str, dict[str, np.ndarra
     return forces
 
 
-def construct_system_forces_from_dict(external_forces: ForcesDict) -> SystemForces:
+def construct_system_forces_from_dict(external_forces: Forcesdict) -> SystemForces:
 
     system_forces = [
         (

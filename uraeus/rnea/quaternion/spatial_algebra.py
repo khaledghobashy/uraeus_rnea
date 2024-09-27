@@ -1,5 +1,4 @@
 from __future__ import annotations
-from typing import Tuple
 import itertools
 
 import jax
@@ -13,7 +12,7 @@ jax.config.update("jax_traceback_filtering", "off")
 
 
 @jax.jit
-def vsplit(arr: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
+def vsplit(arr: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
     """Split an 2D array `arr` into two equally sized sections vertically.
     This mimics the `jnp.vspilt(arr, 2)`, but uses a smart `reshape` trick,
     avoiding expensive copy operations.
@@ -25,7 +24,7 @@ def vsplit(arr: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
 
     Returns
     -------
-    Tuple[jnp.ndarray, jnp.ndarray]
+    tuple[jnp.ndarray, jnp.ndarray]
         A tuple of the two
     """
     top_half, low_half = arr.reshape(2, -1, arr.shape[-1])
@@ -33,7 +32,7 @@ def vsplit(arr: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
 
 
 @jax.jit
-def hsplit(arr: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
+def hsplit(arr: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
     """Split an 2D array `arr` into two equally sized sections horizontally.
     This mimics the `jnp.hspilt(arr, 2)`, but uses a smart `.reshape` trick,
     avoiding expensive copy operations.
@@ -45,7 +44,7 @@ def hsplit(arr: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
 
     Returns
     -------
-    Tuple[jnp.ndarray, jnp.ndarray]
+    tuple[jnp.ndarray, jnp.ndarray]
         A tuple of the two
     """
     top_half, low_half = arr.T.reshape(2, -1, arr.shape[-1])
