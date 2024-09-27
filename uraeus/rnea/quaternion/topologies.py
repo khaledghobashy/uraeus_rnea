@@ -228,9 +228,6 @@ class Model(object):
     def forward_dynamics_pass(
         self, qdt0: np.ndarray, qdt1: np.ndarray, tau: np.ndarray
     ):
-        # forces = [
-        #     list(forces_dict.values()) for name, forces_dict in self.forces_map.items()
-        # ]
         forces = construct_system_forces_from_dict(self.forces_map)
         qdt2 = forward_dynamics_call(self.tree_data, forces, qdt0, qdt1, tau)
         return qdt2
