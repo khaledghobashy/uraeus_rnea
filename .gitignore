@@ -3,7 +3,6 @@
 *.egg-info
 */**/_temp
 *.png
-*/**/tests
 */**/profiling
 uraeus/rnea/utils
 .vscode
