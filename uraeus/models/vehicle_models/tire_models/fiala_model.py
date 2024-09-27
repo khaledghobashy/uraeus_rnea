@@ -1,7 +1,9 @@
+import logging
 from dataclasses import dataclass
 
 import numpy as np
 
+from uraeus.utils.logging import construct_logger
 from uraeus.rnea.bodies import BodyKinematics
 from uraeus.models.vehicle_models.tire_models.contact_point_method import (
     evaluate_transient_slips,
@@ -12,6 +14,8 @@ from uraeus.models.vehicle_models.tire_models.utils import (
     evaluate_tire_slips,
     sigmoid,
 )
+
+logger = construct_logger(__name__, logging.DEBUG)
 
 
 @dataclass
@@ -60,23 +64,24 @@ class FialaTireModel(object):
         tire_kinematics = self.evaluate_tire_kinematics(wheel_kinematics)
         tire_parameters = self.tire_parameters
 
-        kappa, alpha = evaluate_tire_slips(tire_kinematics)
-        # (kappa, alpha), (u, v) = evaluate_transient_slips(
-        #     tire_parameters,
-        #     tire_kinematics,
-        #     low_speed_threshold=2,
-        #     ydt0=np.array([self._u, self._v]),
-        #     t0=self._last_t,
-        #     t=t,
-        # )
-        # self._u = u
-        # self._v = v
-        # self._last_t = t
-        # print("kappa = ", kappa)
-        # print("alpha = ", alpha)
-        # print("u = ", u)
-        # print("v = ", v)
-        # print("sigma_k = ", tire_parameters.sigma_k)
+        (kappa, alpha), (u, v) = evaluate_transient_slips(
+            tire_parameters,
+            tire_kinematics,
+            low_speed_threshold=3,
+            ydt0=np.array([self._u, self._v]),
+            t0=self._last_t,
+            t=t,
+            is_sliding=self._is_sliding,
+        )
+        self._u = u
+        self._v = v
+        self._last_t = t
+        logger.debug(f"kappa = {kappa}")
+        logger.debug(f"alpha = {alpha}")
+        logger.debug(f"u = {u}")
+        logger.debug(f"v = {v}")
+        logger.debug(f"is_sliding = {self._is_sliding}")
+        logger.debug(f"sigma_k = {tire_parameters.sigma_k}")
 
         normal_load = (
             tire_kinematics.vertical_deflection * tire_parameters.kz
@@ -87,7 +92,7 @@ class FialaTireModel(object):
 
         My = Fx * tire_kinematics.effect_radius
 
-        tire_force_SAE = np.array([-Fx, 0, -normal_load])
+        tire_force_SAE = np.array([Fx, -Fy, -normal_load])
         tire_torque_SAE = np.array([0, My, 0])
 
         tire_force_G = tire_kinematics.sae_frame @ tire_force_SAE

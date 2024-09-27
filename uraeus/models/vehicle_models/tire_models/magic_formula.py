@@ -204,8 +204,8 @@ class MagicFormulaTireModel(object):
         _logger.debug("Fx_SAE = %s", Fx)
         _logger.debug("My_SAE = %s", My)
 
-        tire_force_SAE = np.array([Fx, 0, normal_load])
-        tire_torque_SAE = np.array([0, -My, 0])
+        tire_force_SAE = np.array([Fx, -Fy, -normal_load])
+        tire_torque_SAE = np.array([0, My, 0])
 
         tire_force_G = tire_kinematics.sae_frame @ tire_force_SAE
         tire_torque_G = tire_kinematics.sae_frame @ tire_torque_SAE
