@@ -1,3 +1,5 @@
+import logging
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -8,19 +10,22 @@ from uraeus.models.vehicle_models.fsae.topology import (
     VehicleData,
     construct_multibodytree,
 )
-from uraeus.models.vehicle_models.fsae.model import Model
+from uraeus.rnea.quaternion.topologies import Model
 from uraeus.models.vehicle_models.fsae.simulations import (
     static_equilibrium,
     acceleration_sim,
     standing_sim,
-    test_eval_joints_kinematics,
 )
+
+logging.disable(logging.DEBUG)
+
+np.set_printoptions(precision=3)
 
 chassis_data = ChassisData(
     mass=250,
     wheelbase=1.6,
     cg_height=0.3,
-    weight_distribution_f=0.45,
+    weight_distribution_f=0.5,
     inertia_tensor=np.diag([120, 150, 150]),
 )
 
@@ -40,15 +45,14 @@ vehicle_data = VehicleData(
 )
 
 topology = construct_multibodytree(vehicle_data)
-model = Model(topology, vehicle_data)
+model = Model(topology)
+model.vehicle_data = vehicle_data
 
 if __name__ == "__main__":
-    test_eval_joints_kinematics(model)
-    print(static_equilibrium(model, 200 / 3.6))
-    input()
+    print(static_equilibrium(model, 0 / 3.6))
 
     # res = standing_sim(model)
-    res = acceleration_sim(model, 3, 25)
+    res = acceleration_sim(model, 0, 10)
 
     bodies_kinematics = [
         model.forward_kinematics_pass(
@@ -66,38 +70,38 @@ if __name__ == "__main__":
     chassis_a = [kin.a_B for kin in chassis_kin]
 
     plt.figure("chassis_z.png")
-    plt.plot(res.time_history, [p[5] for p in chassis_p])
+    plt.plot(res.time_history, [p.r[2] for p in chassis_p])
+    plt.grid()
+
+    plt.figure("chassis_x.png")
+    plt.plot(res.time_history, [p.r[0] for p in chassis_p])
     plt.grid()
 
     plt.figure("chassis_y.png")
-    plt.plot(res.time_history, [p[4] for p in chassis_p])
-    plt.grid()
-
-    plt.figure("chassis_yaw.png")
-    plt.plot(res.time_history, [p[2] for p in chassis_p])
+    plt.plot(res.time_history, [p.r[1] for p in chassis_p])
     plt.grid()
 
     plt.figure("chassis_z_vel.png")
-    plt.plot(res.time_history, [p[5] for p in chassis_v])
+    plt.plot(res.time_history, [p[2] for p in chassis_v])
     plt.grid()
 
     plt.figure("chassis_vel_x.png")
-    plt.plot(res.time_history, [p[3] * 3.6 for p in chassis_v])
+    plt.plot(res.time_history, [p[0] * 3.6 for p in chassis_v])
     plt.grid()
 
     plt.figure("chassis_acc_x.png")
-    plt.plot(res.time_history, [p[3] / 9.81 for p in chassis_a])
+    plt.plot(res.time_history, [p[0] / 9.81 for p in chassis_a])
     plt.grid()
 
     # plt.figure("fr_wheel_z.png")
     # plt.plot(res.time_history, y[:, 6])
     # plt.grid()
 
-    # plt.figure("wheels_omega.png")
-    # plt.plot(res.time_history, y[:, 24])
-    # plt.plot(res.time_history, y[:, 25])
-    # plt.plot(res.time_history, y[:, 26])
-    # plt.plot(res.time_history, y[:, 27])
-    # plt.grid()
+    plt.figure("wheels_omega.png")
+    plt.plot(res.time_history, res.qdt1_history[:, 10])
+    plt.plot(res.time_history, res.qdt1_history[:, 11])
+    plt.plot(res.time_history, res.qdt1_history[:, 12])
+    plt.plot(res.time_history, res.qdt1_history[:, 13])
+    plt.grid()
 
     plt.show()
