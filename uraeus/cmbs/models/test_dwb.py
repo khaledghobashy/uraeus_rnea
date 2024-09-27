@@ -5,7 +5,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 
 
-from uraeus.rnea.cmbs.rev3.joints import (
+from uraeus.cmbs.joints import (
     RevoluteJoint,
     SphericalJoint,
     UniversalJoint,
@@ -14,8 +14,8 @@ from uraeus.rnea.cmbs.rev3.joints import (
     CylindricalJoint,
     TranslationActuator,
 )
-from uraeus.rnea.cmbs.rev3.bodies import RigidBodyData
-from uraeus.rnea.cmbs.rev3.topologies import (
+from uraeus.cmbs.bodies import RigidBodyData
+from uraeus.cmbs.topologies import (
     MultiBodyGraph,
     construct_multibody_graph_data,
     construct_qdt0,
@@ -242,7 +242,7 @@ numerical_model = construct_multibody_graph_data(model)
 
 
 if __name__ == "__main__":
-    from uraeus.rnea.cmbs.rev2.utils import timer
+    from uraeus.utils.timer_wraper import timer
 
     print(model.graph.nodes)
     print(model.graph.edges)

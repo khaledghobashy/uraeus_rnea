@@ -16,7 +16,7 @@ from .primitive_constraints import (
     AbstractConstraintEquations,
 )
 
-from uraeus.rnea.cmbs.rev2.spatial_algebra import A, triad
+from uraeus.cmbs.spatial_algebra import A, triad, transform_vector
 from .bodies import RigidBodyData
 
 
@@ -41,8 +41,14 @@ def construct_joints_constant(
     R_PG = A(pdt0P_G)
     R_SG = A(pdt0S_G)
 
-    u_P = R_PG.T @ (joint_inputs.pos - rdt0P_G)
-    u_S = R_SG.T @ (joint_inputs.pos - rdt0P_S)
+    # u_P = R_PG.T @ (joint_inputs.pos - rdt0P_G)
+    # u_S = R_SG.T @ (joint_inputs.pos - rdt0P_S)
+
+    # p_GP = Quaternion(pdt0P_G).inv()
+    # p_GS = Quaternion(pdt0S_G).inv()
+
+    u_P = transform_vector(pdt0P_G, joint_inputs.pos - rdt0P_G)
+    u_S = transform_vector(pdt0S_G, joint_inputs.pos - rdt0P_S)
 
     z_axis_1_G = joint_inputs.z_axis_1_G
     x_axis_1_G = joint_inputs.x_axis_1_G
@@ -61,6 +67,8 @@ def construct_joints_constant(
 
     R_J1P = R_PG.T @ R_GJ1
     R_J2S = R_SG.T @ R_GJ2
+
+    # p_J1P = p_GP @
 
     return ConstraintConstants(u_P, u_S, R_J1P, R_J2S)
 

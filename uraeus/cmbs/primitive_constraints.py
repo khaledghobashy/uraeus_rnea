@@ -12,7 +12,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from uraeus.rnea.cmbs.rev3.spatial_algebra import (
+from uraeus.cmbs.spatial_algebra import (
     A,
     B,
     # Quaternion,
