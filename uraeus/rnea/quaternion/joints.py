@@ -1,4 +1,5 @@
 from typing import Callable, NamedTuple, Type, List
+from functools import partial
 
 import jax
 import jax.numpy as jnp
@@ -32,11 +33,41 @@ from uraeus.rnea.quaternion.bodies import RigidBody
 
 
 class JointFrames(NamedTuple):
+    """
+    Represents the frames of a joint.
+
+    Attributes
+    ----------
+    p_SM : SpatialPose
+        The pose of the successor frame (S) in the moving frame (M).
+    p_PF : SpatialPose
+        The pose of the predecessor frame (P) in the fixed frame (F).
+    """
+
     p_SM: SpatialPose
     p_PF: SpatialPose
 
 
 class JointKinematics(NamedTuple):
+    """
+    Represents the kinematics of a joint.
+
+    Attributes
+    ----------
+    p_FM : SpatialPose
+        The pose of the fixed frame (F) in the moving frame (M).
+    p_SP : SpatialPose
+        The pose of the successor frame (S) in the predecessor frame (P).
+    p_PS : SpatialPose
+        The pose of the predecessor frame (P) in the successor frame (S).
+    S_FM : np.ndarray
+        The screw matrix of the joint.
+    v_J : np.ndarray
+        The joint velocity.
+    a_J : np.ndarray
+        The joint acceleration.
+    """
+
     p_FM: SpatialPose
     p_SP: SpatialPose
     p_PS: SpatialPose
@@ -46,6 +77,17 @@ class JointKinematics(NamedTuple):
 
 
 class JointVariables(NamedTuple):
+    """
+    Represents the variables of a joint, including kinematics and forces.
+
+    Attributes
+    ----------
+    kinematics : JointKinematics
+        The kinematics of the joint.
+    forces : MobilizerForces
+        The forces acting on the joint.
+    """
+
     kinematics: JointKinematics
     forces: MobilizerForces
 
@@ -57,12 +99,42 @@ class StatesNames(NamedTuple):
 
 
 class JointConfigInputs(NamedTuple):
+    """
+    Represents the configuration inputs for a joint.
+
+    Attributes
+    ----------
+    pos : np.ndarray
+        The position vector of the joint.
+    z_axis : np.ndarray
+        The z-axis vector of the joint.
+    x_axis : np.ndarray
+        The x-axis vector of the joint.
+    """
+
     pos: np.ndarray
     z_axis: np.ndarray
     x_axis: np.ndarray
 
 
 class JointData(NamedTuple):
+    """
+    Represents the data associated with a joint.
+
+    Attributes
+    ----------
+    name : str
+        The name of the joint.
+    predecessor : RigidBody
+        The predecessor rigid body.
+    successor : RigidBody
+        The successor rigid body.
+    frames : JointFrames
+        The frames of the joint.
+    state_name : StatesNames
+        The state names associated with the joint.
+    """
+
     name: str
     predecessor: RigidBody
     successor: RigidBody
@@ -85,13 +157,41 @@ class AbstractJoint(NamedTuple):
 
 
 class JointInstance(NamedTuple):
+    """
+    Represents an instance of a joint with its data and type.
+
+    Attributes
+    ----------
+    joint_data : JointData
+        The data associated with the joint.
+    joint_type : AbstractJoint
+        The type of the joint.
+    """
+
     joint_data: JointData
     joint_type: AbstractJoint
 
-    # @partial(jax.jit, static_argnums=(0,))
+    @partial(jax.jit, static_argnums=(0,))
     def evaluate_kinematics(
         self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
     ) -> MobilizerKinematics:
+        """
+        Evaluates the kinematics of the joint.
+
+        Parameters
+        ----------
+        qdt0 : np.ndarray
+            Joint coordinates pose.
+        qdt1 : np.ndarray
+            Joint coordinates velocity.
+        qdt2 : np.ndarray
+            Joint coordinates acceleration.
+
+        Returns
+        -------
+        MobilizerKinematics
+            The kinematics of the joint.
+        """
         mobilizer_kinematics = self.joint_type.mobilizer.evaluate_kinematics(
             qdt0, qdt1, qdt2
         )
@@ -134,7 +234,7 @@ class FunctionalJoint(NamedTuple):
     mobilizer: AbstractMobilizer
     frames: JointFrames
 
-    # @partial(jax.jit, static_argnums=(0,))
+    @partial(jax.jit, static_argnums=(0,))
     def evaluate_kinematics(
         self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
     ) -> JointKinematics:
@@ -177,8 +277,6 @@ def evaluate_joint_kinematics(
     p_PF = joint_frames.p_PF
 
     p_FM, S_FM, v_J, a_J = mobilizer_kinematics
-
-    # print("p_FM = ", p_FM)
 
     p_PS = p_SM.inv() @ p_FM @ p_PF
     p_SP = p_PS.inv()
