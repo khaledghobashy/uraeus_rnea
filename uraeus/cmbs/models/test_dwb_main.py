@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 from scipy.optimize import fsolve
 
-from uraeus.rnea.cmbs.rev3.joints import (
+from uraeus.cmbs.joints import (
     RevoluteJoint,
     SphericalJoint,
     UniversalJoint,
@@ -17,8 +17,8 @@ from uraeus.rnea.cmbs.rev3.joints import (
     CylindricalJoint,
     TranslationActuator,
 )
-from uraeus.rnea.cmbs.rev3.bodies import RigidBodyData
-from uraeus.rnea.cmbs.rev3.topologies import (
+from uraeus.cmbs.bodies import RigidBodyData
+from uraeus.cmbs.topologies import (
     MultiBodyGraph,
     construct_multibody_graph_data,
     construct_qdt0,
@@ -143,7 +143,7 @@ if __name__ == "__main__":
     # nx.draw(graph, with_labels=True, font_weight="bold")
     # plt.show()
 
-    # from uraeus.rnea.cmbs.models.topologies import minimizer
+    # from uraeus.cmbs.models.topologies import minimizer
 
     # qdt0 = construct_qdt0(model)
     # q = minimizer(numerical_model, qdt0, 0.2)

@@ -8,8 +8,8 @@ import jax.numpy as jnp
 import numpy as np
 from pydantic import BaseModel
 
-from uraeus.rnea.cmbs.rev3.bodies import RigidBodyData
-from uraeus.rnea.cmbs.rev3.joints import (
+from uraeus.cmbs.bodies import RigidBodyData
+from uraeus.cmbs.joints import (
     FunctionalJoint,
     construct_joint,
     AbstractJoint,

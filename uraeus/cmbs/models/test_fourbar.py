@@ -7,15 +7,15 @@ import matplotlib.pyplot as plt
 
 from scipy.optimize import fsolve
 
-from uraeus.rnea.cmbs.rev2.joints import (
+from uraeus.cmbs.joints import (
     RevoluteJoint,
     SphericalJoint,
     UniversalJoint,
     RotationActuator,
     JointConfigInputs,
 )
-from uraeus.rnea.cmbs.rev2.bodies import RigidBodyData
-from uraeus.rnea.cmbs.rev2.topologies import (
+from uraeus.cmbs.bodies import RigidBodyData
+from uraeus.cmbs.topologies import (
     MultiBodyGraph,
     construct_multibody_graph_data,
     construct_qdt0,
@@ -116,7 +116,7 @@ def static_equilibrium(qdt0, t: float) -> np.ndarray:
 
 
 t_array = np.arange(0, 1, 1e-2)
-from uraeus.rnea.cmbs.rev2.utils import timer
+from uraeus.utils.timer_wraper import timer
 
 kinematic_sim = timer(kinematic_sim)
 
