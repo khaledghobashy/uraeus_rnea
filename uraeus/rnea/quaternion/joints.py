@@ -1,4 +1,4 @@
-from typing import Callable, NamedTuple, Type, List
+from typing import Callable, NamedTuple, Type
 from functools import partial
 
 import jax
@@ -93,9 +93,9 @@ class JointVariables(NamedTuple):
 
 
 class StatesNames(NamedTuple):
-    pos_states: List[str]
-    vel_states: List[str]
-    acc_states: List[str]
+    pos_states: list[str]
+    vel_states: list[str]
+    acc_states: list[str]
 
 
 class JointConfigInputs(NamedTuple):
@@ -142,7 +142,7 @@ class JointData(NamedTuple):
     state_name: StatesNames
 
 
-def construct_state_names(name: str, coordinates_names: List[str]) -> StatesNames:
+def construct_state_names(name: str, coordinates_names: list[str]) -> StatesNames:
     pos_states = [f"{name}_{coordinate}_dt0" for coordinate in coordinates_names]
     vel_states = [f"{name}_{coordinate}_dt1" for coordinate in coordinates_names]
     acc_states = [f"{name}_{coordinate}_dt2" for coordinate in coordinates_names]
@@ -153,7 +153,7 @@ def construct_state_names(name: str, coordinates_names: List[str]) -> StatesName
 class AbstractJoint(NamedTuple):
     nj: int
     mobilizer: AbstractMobilizer
-    coordinates_names: List[str]
+    coordinates_names: list[str]
 
 
 class JointInstance(NamedTuple):
@@ -293,7 +293,7 @@ def construct_custom_joint(
     cls_name: str,
     pose_polynomials: Callable[[np.ndarray], np.ndarray],
     nj: int,
-    coordinates_names: List[str],
+    coordinates_names: list[str],
 ) -> Type[AbstractJoint]:
     pose_jacobian_dt0, pose_jacobian_dt1 = construct_motion_jacobians(pose_polynomials)
     polynomials = MotionEquations(

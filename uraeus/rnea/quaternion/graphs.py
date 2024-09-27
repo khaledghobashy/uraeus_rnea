@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Optional
 from collections import defaultdict
 from functools import reduce, partial
 
@@ -8,9 +8,9 @@ import numpy as np
 
 
 class Graph(object):
-    adj_list: Dict[str, List[str]]
-    nodes: List[str]
-    edges: List[Tuple[str, str]]
+    adj_list: dict[str, list[str]]
+    nodes: list[str]
+    edges: list[tuple[str, str]]
 
     def __init__(self, name: str):
         self.name = name
@@ -28,9 +28,9 @@ class Graph(object):
 
 
 class Tree(object):
-    adj_list: Dict[str, List[str]]
-    nodes: List[str]
-    edges: List[Tuple[str, str]]
+    adj_list: dict[str, list[str]]
+    nodes: list[str]
+    edges: list[tuple[str, str]]
 
     def __init__(self, name: str, root: Optional[str] = "root"):
         self.graph = Graph(name)
@@ -65,10 +65,10 @@ class Tree(object):
 def accumulate_root_to_leaf(
     root_initial: Any,
     cumfunc: Callable[[Any, Any], Any],
-) -> Callable[[List[Any], List[Tuple[int, int, int]]], List[Any]]:
+) -> Callable[[list[Any], list[tuple[int, int, int]]], list[Any]]:
     @partial(jax.jit, static_argnums=(0,))
     def func(
-        traversal_order: Tuple[Tuple[int, int, int], ...], edges_weights: Tuple[Any]
+        traversal_order: tuple[tuple[int, int, int], ...], edges_weights: tuple[Any]
     ):
         nodes_vals = [root_initial]
 
@@ -84,11 +84,11 @@ def accumulate_root_to_leaf(
 
 def accumulate_leaf_to_root(
     cumfunc: Callable[[Any, Any, Any], Any],
-) -> Callable[[List[Any], List[Any], List[Tuple[int, List[int]]]], List[Any]]:
+) -> Callable[[list[Any], list[Any], list[tuple[int, list[int]]]], list[Any]]:
     def func(
-        nodes_weights: List[Any],
-        edges_weights: List[Any],
-        traversal_order: List[Tuple[int, List[int]]],
+        nodes_weights: list[Any],
+        edges_weights: list[Any],
+        traversal_order: list[tuple[int, list[int]]],
     ):
         edges_cumvals = []
         for successor_index, out_edges in traversal_order[:-1]:

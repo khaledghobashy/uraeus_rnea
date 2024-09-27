@@ -1,5 +1,3 @@
-from typing import List, Tuple
-
 import jax
 
 import jax.numpy as jnp
@@ -123,7 +121,7 @@ def construct_mobilizer_force(
 @jax.jit
 def extract_force_components(
     fi_S: np.ndarray, joint_frames: JointFrames, joint_kin: JointKinematics
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     p_SM = joint_frames.p_SM
     p_MS = p_SM.inv()
 
