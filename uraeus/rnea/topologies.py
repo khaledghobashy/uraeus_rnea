@@ -2,7 +2,7 @@ from functools import reduce
 from typing import Dict, List, NamedTuple, Tuple
 
 from uraeus.rnea.bodies import RigidBody, RigidBodyData
-from uraeus.rnea.graphs import Graph, Tree, contstruct_traversal_orders
+from uraeus.rnea.graphs import Graph, Tree, construct_traversal_orders
 from uraeus.rnea.joints import (
     AbstractJoint,
     FunctionalJoint,
@@ -174,7 +174,7 @@ def construct_hybriddynamics_data(
 def construct_multibodydata(topology: MultiBodyTree) -> MultiBodyData:
     func_joints = tuple(map(construct_functional_joint, topology.joints.values()))
     bodies_inertias = [b.I for b in topology.bodies.values()]
-    forward_traversal, backward_traversal = contstruct_traversal_orders(topology.tree)
+    forward_traversal, backward_traversal = construct_traversal_orders(topology.tree)
     qdt0_idx = [0] + list(np.cumsum([j.nj for j in func_joints]))
     qdt1_idx = qdt0_idx  # Equal each other for now. Later could be different.
 
