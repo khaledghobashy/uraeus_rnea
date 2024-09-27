@@ -1,10 +1,10 @@
 from functools import reduce
-from typing import Dict, List, NamedTuple, Tuple, Callable
+from typing import Dict, List, NamedTuple, Tuple, Callable, Optional
 
 import numpy as np
 
 from uraeus.rnea.quaternion.bodies import RigidBody, RigidBodyData, BodyKinematics
-from uraeus.rnea.quaternion.tree_traversals import base_to_tip
+from uraeus.rnea.quaternion.tree_traversals import base_to_tip, SystemForces
 from uraeus.rnea.quaternion.graphs import Graph, Tree, construct_traversal_orders
 
 from uraeus.rnea.quaternion.joints import (
@@ -26,6 +26,8 @@ from uraeus.rnea.quaternion.algorithms import (
     inverse_dynamics_call,
     forward_dynamics_call,
 )
+
+ForcesDict = dict[str, dict[str, dict[str, np.ndarray]]]
 
 
 class MultiBodyGraph(object):
@@ -186,14 +188,15 @@ def construct_multibodydata(topology: MultiBodyTree) -> MultiBodyData:
 
 class Model(object):
     topology: MultiBodyTree
-    forces_map: Dict[str, Dict[str, np.ndarray]]
+    forces_map: ForcesDict
     tree_data: MultiBodyData
 
     def __init__(self, topology: MultiBodyTree):
         self.topology = topology
         gravity = np.array([0, 0, -9.81, 0, 0, 0])
         self.forces_map = {
-            b.name: {"gravity": b.I @ gravity} for b in self.topology.bodies.values()
+            b.name: {"global": {"gravity": b.I @ gravity}, "local": dict()}
+            for b in self.topology.bodies.values()
         }
 
         self.tree_data = construct_multibodydata(topology)
@@ -218,18 +221,17 @@ class Model(object):
     def inverse_dynamics_pass(
         self, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray
     ) -> IDCallRes:
-        forces = [
-            list(forces_dict.values()) for name, forces_dict in self.forces_map.items()
-        ]
+        forces = construct_system_forces_from_dict(self.forces_map)
         res = inverse_dynamics_call(self.tree_data, forces, qdt0, qdt1, qdt2)
         return res
 
     def forward_dynamics_pass(
         self, qdt0: np.ndarray, qdt1: np.ndarray, tau: np.ndarray
     ):
-        forces = [
-            list(forces_dict.values()) for name, forces_dict in self.forces_map.items()
-        ]
+        # forces = [
+        #     list(forces_dict.values()) for name, forces_dict in self.forces_map.items()
+        # ]
+        forces = construct_system_forces_from_dict(self.forces_map)
         qdt2 = forward_dynamics_call(self.tree_data, forces, qdt0, qdt1, tau)
         return qdt2
 
@@ -240,6 +242,24 @@ class Model(object):
         forces_func: Callable,
     ):
         qdt0, qdt1 = ydt0.reshape(2, -1)
-        gen_forces = forces_func(self, qdt0, qdt1, 0 * qdt1, t)
-        qdt2 = self.forward_dynamics_pass(qdt0, qdt1, gen_forces)
+        tau, self.forces_map = forces_func(self, qdt0, qdt1, 0 * qdt1, t)
+        qdt2 = self.forward_dynamics_pass(qdt0, qdt1, tau)
         return np.hstack([qdt1, qdt2])
+
+
+def _convert_body_forces_dict_to_list(forces_dict: dict[str, dict[str, np.ndarray]]):
+    forces = list(forces_dict.values()) if len(forces_dict) > 0 else []
+    return forces
+
+
+def construct_system_forces_from_dict(external_forces: ForcesDict) -> SystemForces:
+
+    system_forces = [
+        (
+            _convert_body_forces_dict_to_list(forces_dict["global"]),
+            _convert_body_forces_dict_to_list(forces_dict["local"]),
+        )
+        for forces_dict in external_forces.values()
+    ]
+    # print(system_forces)
+    return system_forces

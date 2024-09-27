@@ -21,6 +21,7 @@ from uraeus.rnea.quaternion.tree_traversals import (
     tip_to_base,
     evaluate_tau,
     joints_forces_accumulator,
+    SystemForces,
 )
 
 
@@ -62,7 +63,7 @@ class IDCallRes(NamedTuple):
 @partial(jax.jit, static_argnums=(0,))
 def inverse_dynamics_call(
     tree_data: MultiBodyData,
-    external_forces: List[List[np.ndarray]],
+    external_forces: SystemForces,
     qdt0: np.ndarray,
     qdt1: np.ndarray,
     qdt2: np.ndarray,
@@ -96,7 +97,7 @@ def inverse_dynamics_call(
 @partial(jax.jit, static_argnums=(0,))
 def evaluate_C(
     tree_data: MultiBodyData,
-    external_forces: List[List[np.ndarray]],
+    external_forces: SystemForces,
     qdt0: np.ndarray,
     qdt1: np.ndarray,
 ) -> IDCallRes:
@@ -108,7 +109,7 @@ def evaluate_C(
 @partial(jax.jit, static_argnums=(0,))
 def forward_dynamics_call(
     tree_data: MultiBodyData,
-    external_forces: List[List[np.ndarray]],
+    external_forces: SystemForces,
     qdt0: np.ndarray,
     qdt1: np.ndarray,
     tau: np.ndarray,
@@ -198,7 +199,7 @@ class HybridDynamics(object):
     def evaluate_C(
         self,
         hybrid_data: HybridDynamicsData,
-        external_forces: List[List[np.ndarray]],
+        external_forces: SystemForces,
         qdt0: np.ndarray,
         qdt1: np.ndarray,
         qdt2_id: np.ndarray,
@@ -214,7 +215,7 @@ class HybridDynamics(object):
     def forward_dynamics_call(
         self,
         hybrid_data: HybridDynamicsData,
-        external_forces: List[List[np.ndarray]],
+        external_forces: SystemForces,
         qdt0: np.ndarray,
         qdt1: np.ndarray,
         qdt2_id: np.ndarray,
@@ -252,14 +253,16 @@ _bodies_config_func = accumulate_root_to_leaf(
 def ext_forces_to_gen_forces(
     tree_data: MultiBodyData,
     joints_kin: Tuple[JointKinematics, ...],
-    ext_forces: Tuple[Tuple[np.ndarray, ...], ...],
+    ext_forces: SystemForces,
 ):
     bodies_p_GB = _bodies_config_func(tree_data.forward_traversal, joints_kin)
-    bodies_fe_S = map(
+    bodies_fe_S_g = map(
         express_screw,
         bodies_p_GB,
-        [sum(forces, np.zeros((6,))) for forces in ext_forces],
+        [sum(forces[0], jnp.zeros((6,))) for forces in ext_forces],
     )
+    bodies_fe_S_l = [sum(forces[1], jnp.zeros((6,))) for forces in ext_forces]
+    bodies_fe_S = [f1 + f2 for f1, f2 in zip(bodies_fe_S_g, bodies_fe_S_l)]
     forces_transforms = [(j.p_SP) for j in reversed(joints_kin)]
     joints_forces = list(
         reversed(
