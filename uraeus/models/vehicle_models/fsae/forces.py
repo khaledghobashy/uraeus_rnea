@@ -111,18 +111,23 @@ def evaluate_forces(
     # forces_map["rr_wheel"]["local"]["tire"] = rr_tire_force
     # forces_map["rl_wheel"]["local"]["tire"] = rl_tire_force
 
-    forces_map["fr_wheel"]["global"]["tire"] = express_screw(
-        fr_carier_kin.p_BG, fr_tire_force
-    )
-    forces_map["fl_wheel"]["global"]["tire"] = express_screw(
-        fl_carier_kin.p_BG, fl_tire_force
-    )
-    forces_map["rr_wheel"]["global"]["tire"] = express_screw(
-        rr_carier_kin.p_BG, rr_tire_force
-    )
-    forces_map["rl_wheel"]["global"]["tire"] = express_screw(
-        rl_carier_kin.p_BG, rl_tire_force
-    )
+    # forces_map["fr_wheel"]["global"]["tire"] = express_screw(
+    #     fr_carier_kin.p_BG, fr_tire_force
+    # )
+    # forces_map["fl_wheel"]["global"]["tire"] = express_screw(
+    #     fl_carier_kin.p_BG, fl_tire_force
+    # )
+    # forces_map["rr_wheel"]["global"]["tire"] = express_screw(
+    #     rr_carier_kin.p_BG, rr_tire_force
+    # )
+    # forces_map["rl_wheel"]["global"]["tire"] = express_screw(
+    #     rl_carier_kin.p_BG, rl_tire_force
+    # )
+
+    forces_map["fr_wheel"]["global"]["tire"] = fr_tire_force
+    forces_map["fl_wheel"]["global"]["tire"] = fl_tire_force
+    forces_map["rr_wheel"]["global"]["tire"] = rr_tire_force
+    forces_map["rl_wheel"]["global"]["tire"] = rl_tire_force
 
     # thrust = 250 * 9.81 if t > 1 else 0
     # forces_map["chassis"]["thrust"] = np.array([thrust, 0, 0, 0, 0, 0])

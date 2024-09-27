@@ -22,19 +22,6 @@ def normalize(v):
 
 
 logger = construct_logger(__name__, logging.DEBUG)
-# logger = logging.getLogger(__name__)
-# logger.setLevel(logging.DEBUG)
-
-# # Create handlers
-# console_handler = logging.StreamHandler()
-
-# # Set level for handlers
-# console_handler.setLevel(logging.DEBUG)
-
-# # Create formatters and add them to handlers
-# formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-# console_handler.setFormatter(formatter)
-# logger.addHandler(console_handler)
 
 
 @dataclass
@@ -134,7 +121,7 @@ class BrushTireModel(object):
         (kappa, alpha), (u, v) = evaluate_transient_slips(
             tire_parameters,
             tire_kinematics,
-            low_speed_threshold=2,
+            low_speed_threshold=3,
             ydt0=np.array([self._u, self._v]),
             t0=self._last_t,
             t=t,
@@ -159,12 +146,13 @@ class BrushTireModel(object):
         (Fx, Fy), xt = self.evaluate_local_forces(normal_load, kappa, alpha)
 
         My = Fx * tire_kinematics.effect_radius
+        Mz = -xt * Fy
 
         logger.debug(f"Fx_SAE = {Fx}")
         logger.debug(f"My_SAE = {My}")
 
-        tire_force_SAE = np.array([Fx, Fy, normal_load])
-        tire_torque_SAE = np.array([0, -My, 0])
+        tire_force_SAE = np.array([Fx, -Fy, -normal_load])
+        tire_torque_SAE = np.array([0, My, Mz])
 
         tire_force_G = tire_kinematics.sae_frame @ tire_force_SAE
         tire_torque_G = tire_kinematics.sae_frame @ tire_torque_SAE
