@@ -152,8 +152,8 @@ class BouncePitchModelTest(unittest.TestCase):
         F1 = self.multibody_system.F1(f1_x, f1_v, (0.9 * self.m1 * 9.81))
         F2 = self.multibody_system.F2(f2_x, f2_v, (0.8 * self.m2 * 9.81))
 
-        self.multibody_system.forces_map["m1"]["F1"] = F1
-        self.multibody_system.forces_map["m1"]["F2"] = F2
+        self.multibody_system.forces_map["m1"]["global"]["F1"] = F1
+        self.multibody_system.forces_map["m1"]["global"]["F2"] = F2
 
         qdt2 = self.multibody_system.forward_dynamics_pass(
             qdt0, qdt1, np.zeros_like(qdt1)

@@ -86,11 +86,11 @@ class MassSpringDamperTest(unittest.TestCase):
 
     def _evaluate_multibody_forward_dynamics(self, t, ydt0):
         qdt0, qdt1 = ydt0.reshape(2, -1)
-        self.multibody_system.forces_map["m1"]["spring"] = self.multibody_system.fk(
-            qdt0[0]
+        self.multibody_system.forces_map["m1"]["global"]["spring"] = (
+            self.multibody_system.fk(qdt0[0])
         )
-        self.multibody_system.forces_map["m1"]["damper"] = self.multibody_system.fc(
-            qdt1[0]
+        self.multibody_system.forces_map["m1"]["global"]["damper"] = (
+            self.multibody_system.fc(qdt1[0])
         )
 
         qdt2 = self.multibody_system.forward_dynamics_pass(

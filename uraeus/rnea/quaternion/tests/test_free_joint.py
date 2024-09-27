@@ -199,14 +199,18 @@ class DoubleMassSpringDamperTest(unittest.TestCase):
 
     def _evaluate_test_forward_dynamics(self, t, ydt0):
         qdt0, qdt1 = ydt0.reshape(2, -1)
-        self.test_system.forces_map["m1"]["spring"] = self.multibody_system.fk(qdt0[2])
-        self.test_system.forces_map["m1"]["damper"] = self.multibody_system.fc(qdt1[2])
-
-        self.test_system.forces_map["m2"]["spring"] = self.multibody_system.fk(
-            qdt0[2 + 6]
+        self.test_system.forces_map["m1"]["global"]["spring"] = (
+            self.multibody_system.fk(qdt0[2])
         )
-        self.test_system.forces_map["m2"]["damper"] = self.multibody_system.fc(
-            qdt1[2 + 6]
+        self.test_system.forces_map["m1"]["global"]["damper"] = (
+            self.multibody_system.fc(qdt1[2])
+        )
+
+        self.test_system.forces_map["m2"]["global"]["spring"] = (
+            self.multibody_system.fk(qdt0[2 + 6])
+        )
+        self.test_system.forces_map["m2"]["global"]["damper"] = (
+            self.multibody_system.fc(qdt1[2 + 6])
         )
 
         qdt2 = self.test_system.forward_dynamics_pass(qdt0, qdt1, np.zeros_like(qdt1))
@@ -215,11 +219,19 @@ class DoubleMassSpringDamperTest(unittest.TestCase):
 
     def _evaluate_true_forward_dynamics(self, t, ydt0):
         qdt0, qdt1 = ydt0.reshape(2, -1)
-        self.true_system.forces_map["m1"]["spring"] = self.multibody_system.fk(qdt0[0])
-        self.true_system.forces_map["m1"]["damper"] = self.multibody_system.fc(qdt1[0])
+        self.true_system.forces_map["m1"]["global"]["spring"] = (
+            self.multibody_system.fk(qdt0[0])
+        )
+        self.true_system.forces_map["m1"]["global"]["damper"] = (
+            self.multibody_system.fc(qdt1[0])
+        )
 
-        self.true_system.forces_map["m2"]["spring"] = self.multibody_system.fk(qdt0[1])
-        self.true_system.forces_map["m2"]["damper"] = self.multibody_system.fc(qdt1[1])
+        self.true_system.forces_map["m2"]["global"]["spring"] = (
+            self.multibody_system.fk(qdt0[1])
+        )
+        self.true_system.forces_map["m2"]["global"]["damper"] = (
+            self.multibody_system.fc(qdt1[1])
+        )
 
         qdt2 = self.true_system.forward_dynamics_pass(qdt0, qdt1, np.zeros_like(qdt1))
 
