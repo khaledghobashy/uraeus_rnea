@@ -53,15 +53,18 @@ def evaluate_joint_inertia_force(
     successor_I: np.ndarray,
     external_forces: List[np.ndarray],
 ) -> np.ndarray:
-    fb_S = (successor_I @ successor_kin.a_B) + (
-        motion_to_force_transform(spatial_skew(successor_kin.v_B))
-        @ (successor_I @ successor_kin.v_B)
+    fi_S_qdt2 = successor_I @ successor_kin.a_B
+    fi_S_qdt1 = motion_to_force_transform(spatial_skew(successor_kin.v_B)) @ (
+        successor_I @ successor_kin.v_B
     )
+    fi_S = fi_S_qdt2 + fi_S_qdt1
+
     R_BG = get_orientation_matrix_from_transformation(successor_kin.X_BG)
     E_BG = spatial_motion_rotation(R_BG)
     fe_S = motion_to_force_transform(E_BG) @ sum(external_forces, np.zeros((6,)))
 
-    return fb_S - fe_S
+    fb_S = fi_S - fe_S
+    return fb_S
 
 
 @jax.jit
