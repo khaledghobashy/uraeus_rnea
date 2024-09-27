@@ -3,26 +3,24 @@ from typing import NamedTuple
 import numpy as np
 
 from uraeus.rnea.spatial_algebra import (
-    spatial_motion_transformation,
-    spatial_transform_transpose,
-    get_euler_angles_from_rotation,
+    SpatialPose,
+    transform_vector,
+    quaternion_inverse,
 )
 
 
 class RigidBodyData(NamedTuple):
 
     location: np.ndarray = np.array([0.0, 0.0, 0.0])
-    orientation: np.ndarray = np.eye(3)
+    orientation: np.ndarray = np.array([1.0, 0.0, 0.0, 0.0])
     mass: float = 0.0
     inertia_tensor: np.ndarray = np.zeros((3, 3))
 
 
 class BodyKinematics(NamedTuple):
 
-    X_BG: np.ndarray
-    X_GB: np.ndarray
-    p_GB: np.ndarray
-    R_GB: np.ndarray
+    p_GB: SpatialPose
+    p_BG: SpatialPose
     v_B: np.ndarray
     a_B: np.ndarray
     v_G: np.ndarray
@@ -40,8 +38,8 @@ class RigidBody(object):
         self.body_data = body_data
         self.I = np.vstack(
             [
-                np.hstack([body_data.inertia_tensor, np.zeros((3, 3))]),
-                np.hstack([np.zeros((3, 3)), body_data.mass * np.eye(3)]),
+                np.hstack([body_data.mass * np.eye(3), np.zeros((3, 3))]),
+                np.hstack([np.zeros((3, 3)), body_data.inertia_tensor]),
             ]
         )
 
@@ -50,26 +48,19 @@ class RigidBody(object):
         )
 
 
-def get_initialized_body_kinematics(
-    location: np.ndarray, orientation: np.ndarray
-) -> BodyKinematics:
+def get_initialized_body_kinematics(r: np.ndarray, q_BG: np.ndarray) -> BodyKinematics:
 
-    r = orientation.T @ -location
-    X_GB = spatial_motion_transformation(orientation, r)
+    # r: position vector of body relative to global-origin expressed in global frame
+    # q_BG transforms from body from to global frame
 
-    X_BG = spatial_transform_transpose(X_GB)
-
-    e_GB = get_euler_angles_from_rotation(orientation)
-
-    p_GB = np.hstack([e_GB, location])
+    p_BG = SpatialPose(transform_vector(quaternion_inverse(q_BG), -r), q_BG)
+    p_GB = p_BG.inv()
 
     zeros = np.zeros((6,))
 
     kin = BodyKinematics(
-        X_BG,
-        X_GB,
         p_GB,
-        orientation,
+        p_BG,
         zeros,
         zeros,
         zeros,

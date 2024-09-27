@@ -1,8 +1,8 @@
 import numpy as np
 from scipy import interpolate
 
-from uraeus.rnea.quaternion.spatial_algebra import skew_M
-from uraeus.rnea.quaternion.bodies import BodyKinematics
+from uraeus.rnea.spatial_algebra import skew_M
+from uraeus.rnea.bodies import BodyKinematics
 
 
 def aero_force(coeff: float, frontal_area: float, vel: float) -> float:

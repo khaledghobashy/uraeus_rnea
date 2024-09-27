@@ -2,8 +2,8 @@ from typing import NamedTuple
 
 import numpy as np
 
-from uraeus.rnea.quaternion.spatial_algebra import express_screw
-from uraeus.rnea.quaternion.topologies import Model
+from uraeus.rnea.spatial_algebra import express_screw
+from uraeus.rnea.topologies import Model
 from uraeus.models.vehicle_models.tire_models.fiala_model import (
     FialaTireModel,
     FialaTireParameters,

@@ -4,13 +4,13 @@ import numpy as np
 import jax.numpy as jnp
 import jax
 
-from uraeus.rnea.quaternion.bodies import RigidBodyData
-from uraeus.rnea.quaternion.joints import (
+from uraeus.rnea.bodies import RigidBodyData
+from uraeus.rnea.joints import (
     JointConfigInputs,
     FreeJoint,
     TranslationalJoint,
 )
-from uraeus.rnea.quaternion.topologies import MultiBodyTree, Model
+from uraeus.rnea.topologies import MultiBodyTree, Model
 
 
 class AnalyticalMassSpringDamper(object):

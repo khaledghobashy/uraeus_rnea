@@ -5,13 +5,13 @@ from collections import namedtuple
 import numpy as np
 
 from uraeus.utils.logging import construct_logger
-from uraeus.rnea.quaternion.bodies import RigidBodyData
-from uraeus.rnea.quaternion.joints import (
+from uraeus.rnea.bodies import RigidBodyData
+from uraeus.rnea.joints import (
     JointConfigInputs,
     TranslationalJoint,
     RevoluteJoint,
 )
-from uraeus.rnea.quaternion.topologies import MultiBodyTree, Model
+from uraeus.rnea.topologies import MultiBodyTree, Model
 from uraeus.models.vehicle_models.tire_models.magic_formula import (
     read_tire_file,
     MagicFormulaTireModel,

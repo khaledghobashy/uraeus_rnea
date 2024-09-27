@@ -10,7 +10,7 @@ from uraeus.models.vehicle_models.fsae.topology import (
     VehicleData,
     construct_multibodytree,
 )
-from uraeus.rnea.quaternion.topologies import Model
+from uraeus.rnea.topologies import Model
 from uraeus.models.vehicle_models.fsae.simulations import (
     static_equilibrium,
     acceleration_sim,
