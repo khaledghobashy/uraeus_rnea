@@ -21,6 +21,7 @@ from uraeus.rnea.algorithms import (
     split_coordinates,
     MultiBodyData,
     HybridDynamicsData,
+    HybridDynamics,
     IDCallRes,
     inverse_dynamics_call,
     forward_dynamics_call,
@@ -151,12 +152,12 @@ def construct_permutation_matrix(dof: int, id_indices: list[int]) -> np.ndarray:
 
 
 def construct_hybriddynamics_data(
-    tree_data: MultiBodyData, id_coordintaes: np.ndarray
+    tree_data: MultiBodyData, id_coordinates: np.ndarray
 ) -> HybridDynamicsData:
     n_dof = sum([j.nj for j in tree_data.joints])
-    n_id = len(id_coordintaes)
+    n_id = len(id_coordinates)
     n_fd = n_dof - n_id
-    Q = construct_permutation_matrix(n_dof, id_coordintaes)
+    Q = construct_permutation_matrix(n_dof, id_coordinates)
 
     data = HybridDynamicsData(
         tree_data=tree_data,
@@ -241,6 +242,63 @@ class Model(object):
         tau, self.forces_map = forces_func(self, qdt0, qdt1, 0 * qdt1, t)
         qdt2 = self.forward_dynamics_pass(qdt0, qdt1, tau)
         return np.hstack([qdt1, qdt2])
+
+
+class HybridModel(Model):
+
+    hybrid_dynamics_data: HybridDynamicsData
+
+    def __init__(self, topology: MultiBodyTree, id_coordinates: np.ndarray):
+        super().__init__(topology)
+        self.hybrid_dynamics_data = construct_hybriddynamics_data(
+            self.tree_data, id_coordinates
+        )
+
+    def forward_dynamics_call(
+        self,
+        qdt0: np.ndarray,
+        qdt1: np.ndarray,
+        qdt2_id: np.ndarray,
+        tau_fd: np.ndarray,
+    ) -> np.ndarray:
+        system_forces = construct_system_forces_from_dict(self.forces_map)
+        qdt2_fd = HybridDynamics().forward_dynamics_call(
+            self.hybrid_dynamics_data,
+            system_forces,
+            qdt0,
+            qdt1,
+            qdt2_id,
+            tau_fd,
+        )
+        return qdt2_fd
+
+    def ssode(
+        self, t, ydt0, forces_func: Callable, motion_func: Callable
+    ) -> np.ndarray:
+
+        qdt0_fd, qdt1_fd = ydt0.reshape(2, -1)
+        qdt2_fd = 0 * qdt1_fd
+        qdt0_id, qdt1_id, qdt2_id = motion_func(t)
+
+        n_fd = self.hybrid_dynamics_data.n_fd
+
+        qdt0 = self.hybrid_dynamics_data.permutation_matrix.T @ np.array(
+            [*qdt0_fd, *qdt0_id]
+        )
+        qdt1 = self.hybrid_dynamics_data.permutation_matrix.T @ np.array(
+            [*qdt1_fd, *qdt1_id]
+        )
+        qdt2 = self.hybrid_dynamics_data.permutation_matrix.T @ np.array(
+            [*qdt2_fd, *qdt2_id]
+        )
+
+        tau, self.forces_map = forces_func(self, qdt0, qdt1, qdt2, t)
+
+        tau_fd = (self.hybrid_dynamics_data.permutation_matrix @ tau)[:n_fd]
+
+        qdt2_fd = self.forward_dynamics_call(qdt0, qdt1, qdt2_id, tau_fd)
+        ydt2 = np.array([*qdt1_fd, *qdt2_fd])
+        return ydt2
 
 
 def _convert_body_forces_dict_to_list(forces_dict: dict[str, dict[str, np.ndarray]]):
