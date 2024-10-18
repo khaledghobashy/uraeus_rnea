@@ -50,12 +50,18 @@ class BrushTireModel(object):
 
     tire_parameters: BrushModelParameters
 
-    def __init__(self, tire_parameters: BrushModelParameters):
+    def __init__(
+        self, tire_parameters: BrushModelParameters, use_cpm_model: bool = False
+    ):
         self.tire_parameters = tire_parameters
         self._u = 0
         self._v = 0
         self._last_t = 0
         self._is_sliding = False
+
+        self._evaluate_tire_slips = (
+            evaluate_transient_slips if use_cpm_model else evaluate_tire_slips
+        )
 
     def evaluate_tire_kinematics(
         self, wheel_kinematics: BodyKinematics
@@ -83,18 +89,10 @@ class BrushTireModel(object):
             )
             TG = Theta * sigma
 
-            # if sigma <= 1 / Theta:
-            #     factor = 3 * (TG) - 3 * (TG) ** 2 + (TG) ** 3
-            #     force = tire_parameters.mu * normal_load * factor
-            # else:
-            #     force = tire_parameters.mu * normal_load
-
             transition = sigmoid(100 * (sigma - 1 / Theta))
             factor = (3 * TG - 3 * TG**2 + TG**3) * (1 - transition) + transition
             force = tire_parameters.mu * normal_load * factor
 
-            logger.debug(f"sigma_x = {sigma_x}")
-            logger.debug(f"Theta = {Theta}")
             F = force * normalize(sigma_vec)
             # Pneumatic Trail
             xt = (
@@ -117,6 +115,8 @@ class BrushTireModel(object):
         tire_parameters = self.tire_parameters
 
         # kappa, alpha = evaluate_tire_slips(tire_kinematics)
+        # logger.debug(f"kappa = {kappa}")
+        # logger.debug(f"alpha = {alpha}")
 
         (kappa, alpha), (u, v) = evaluate_transient_slips(
             tire_parameters,
@@ -136,7 +136,8 @@ class BrushTireModel(object):
         logger.debug(f"v = {v}")
         logger.debug(f"is_sliding = {self._is_sliding}")
         logger.debug(f"sigma_k = {tire_parameters.sigma_k}")
-        # logger.debug(f"tire_kinematics = {tire_kinematics}")
+        logger.debug(f"sigma_a = {tire_parameters.sigma_a}")
+        logger.debug(f"tire_kinematics = {tire_kinematics}")
 
         normal_load = (
             tire_kinematics.vertical_deflection * tire_parameters.kz
@@ -149,9 +150,11 @@ class BrushTireModel(object):
         Mz = -xt * Fy
 
         logger.debug(f"Fx_SAE = {Fx}")
+        logger.debug(f"Fy_SAE = {Fy}")
         logger.debug(f"My_SAE = {My}")
+        logger.debug(f"Mz_SAE = {Mz}")
 
-        tire_force_SAE = np.array([Fx, -Fy, -normal_load])
+        tire_force_SAE = np.array([Fx, Fy, -normal_load])
         tire_torque_SAE = np.array([0, My, Mz])
 
         tire_force_G = tire_kinematics.sae_frame @ tire_force_SAE
@@ -184,18 +187,32 @@ if __name__ == "__main__":
         )
         tire_model = BrushTireModel(tire_parameters)
 
-        plt.figure()
-        for load in normal_loads:
-            Fx = [
-                tire_model.evaluate_local_forces(load, kappa, 0)[0][0]
-                for kappa in kappas
-            ]
+        Fx_s = [
+            [tire_model.evaluate_local_forces(load, kappa, 0)[0][0] for kappa in kappas]
+            for load in normal_loads
+        ]
+        Fy_s = [
+            [tire_model.evaluate_local_forces(load, 0, kappa)[0][1] for kappa in kappas]
+            for load in normal_loads
+        ]
 
+        plt.figure()
+        for Fx, load in zip(Fx_s, normal_loads):
             plt.plot(kappas, Fx, label=f"Load: {load} N")
 
         plt.xlabel("Kappa")
         plt.ylabel("Force (Fx)")
         plt.title("Force vs. Kappa for different Normal Loads")
+        plt.grid()
+        plt.legend()
+
+        plt.figure()
+        for Fy, load in zip(Fy_s, normal_loads):
+            plt.plot(kappas, Fy, label=f"Load: {load} N")
+
+        plt.xlabel("Kappa")
+        plt.ylabel("Force (Fy)")
+        plt.title("Force vs. alpha for different Normal Loads")
         plt.grid()
         plt.legend()
         plt.show()

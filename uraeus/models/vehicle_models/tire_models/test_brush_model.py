@@ -8,10 +8,15 @@ from uraeus.rnea.bodies import RigidBodyData
 from uraeus.rnea.joints import (
     JointConfigInputs,
     TranslationalJoint,
-    PlanarJoint,
     RevoluteJoint,
+    CylindricalJoint,
 )
-from uraeus.rnea.topologies import MultiBodyTree, Model
+from uraeus.rnea.topologies import (
+    MultiBodyTree,
+    Model,
+    HybridModel,
+    reconstruct_system_coordinates,
+)
 from uraeus.models.vehicle_models.tire_models.brush_model import (
     BrushModelParameters,
     BrushTireModel,
@@ -30,7 +35,7 @@ class Forces(object):
         Cfk=50e3,
         Cfa=50e3,
         Cfx=150e3,
-        Cfy=1500,
+        Cfy=150e3,
         a=0.10,
         unloaded_radius=0.313,
         kz=150e3,
@@ -75,19 +80,23 @@ class QuarterCarModel(object):
         tree.add_joint(
             "j1", "ground", "slider", slider_body, TranslationalJoint, j1_data
         )
-        tree.add_joint(
-            "j2", "slider", "carier", carier_body, TranslationalJoint, j2_data
-        )
+        tree.add_joint("j2", "slider", "carier", carier_body, CylindricalJoint, j2_data)
         tree.add_joint("j3", "carier", "wheel", wheel_body, RevoluteJoint, j3_data)
 
-        self.model = Model(tree)
+        # self.model = Model(tree)
+        self.model = HybridModel(tree, id_coordinates=[2])
+        logger.debug(self.model.hybrid_dynamics_data.permutation_matrix)
 
-    def calculate_external_forces(
-        self, model, qdt0: np.ndarray, qdt1: np.ndarray, qdt2: np.ndarray, t
+    def evaluate_force_inputs(
+        self, model, t: float, ydt0: np.ndarray, u: dict[str, float]
     ):
+        qdt0, qdt1 = ydt0.reshape(2, -1)
+        qdt2 = np.zeros((model.dof,))
+
         model = self.model
         bodies_kinematics, _ = model.forward_kinematics_pass(qdt0, qdt1, qdt2)
         wheel_kin = model.get_body_kinematics("wheel", bodies_kinematics)
+
         tire_force = Forces.tire(wheel_kin, t)
 
         wn = 2 * (2 * np.pi)
@@ -99,10 +108,12 @@ class QuarterCarModel(object):
         model.forces_map["wheel"]["global"]["load"] = np.array(
             [0, 0, -65 * 9.81, 0, 0, 0]
         )
-        # torque = (10 * t) if t > 1 else 0
-        torque = (200) if t > 1 else 0
+        torque = (100) if t > 1 else 0
         torque = 0 if t > 5 else torque
-        tau = np.array([0, (-stiffness * qdt0[1] - damping * qdt1[1]), torque])
+        steering_torque = 0
+        tau = np.array(
+            [0, (-stiffness * qdt0[1] - damping * qdt1[1]), steering_torque, torque]
+        )
         logger.debug("Input torque = %s", torque)
         logger.debug("Tire Fz = %s", tire_force[2])
         logger.debug("Tire Fx = %s", tire_force[0])
@@ -110,11 +121,22 @@ class QuarterCarModel(object):
         logger.debug("Tire My = %s", tire_force[4])
         return tau, model.forces_map
 
+    def evaluate_motion_inputs(
+        self, model, t: float, ydt0: np.ndarray, u: dict[str, float]
+    ):
+        return steering_function(t)
+
 
 if __name__ == "__main__":
 
     import scipy.integrate as integrate
     import matplotlib.pyplot as plt
+
+    def steering_function(t):
+        angle = 0 * min(np.radians(10) * (t - 1), np.radians(10)) if t > 1 else 0
+        return np.array([angle]), np.array([0]), np.array([0])
+
+    quarter_car_model = QuarterCarModel()
 
     def simulate(ssode, ydt0, t_end):
 
@@ -127,10 +149,19 @@ if __name__ == "__main__":
         while stepper.status == "running":
             y = stepper.y
             ydt1 = ssode(stepper.t, y)
-            qdt0, qdt1 = y.reshape(2, -1)
-            _, qdt2 = ydt1.reshape(2, -1)
+            qdt0_fd, qdt1_fd = y.reshape(2, -1)
+            _, qdt2_fd = ydt1.reshape(2, -1)
 
             print("sim-time = ", stepper.t)
+            print(qdt0_fd)
+
+            qdt0_id, qdt1_id, qdt2_id = steering_function(stepper.t)
+
+            qdt0, qdt1, qdt2 = reconstruct_system_coordinates(
+                quarter_car_model.model,
+                (qdt0_fd, qdt1_fd, qdt2_fd),
+                (qdt0_id, qdt1_id, qdt2_id),
+            )
             print(qdt0)
 
             time_history.append(stepper.t)
@@ -139,20 +170,25 @@ if __name__ == "__main__":
             qdt2_history.append(qdt2)
             stepper.step()
 
-        return time_history, qdt0_history, qdt1_history, qdt2_history
+        return (
+            np.array(time_history),
+            np.array(qdt0_history),
+            np.array(qdt1_history),
+            np.array(qdt2_history),
+        )
 
-    quarter_car_model = QuarterCarModel()
+    ssode = lambda t, ydt0: quarter_car_model.model.ssode(
+        t,
+        ydt0,
+        {},
+        quarter_car_model.evaluate_motion_inputs,
+        quarter_car_model.evaluate_force_inputs,
+    )
 
     v = 0 / 3.6
     r = 0.31
-    true_t, true_qdt0, true_qdt1, true_qdt2 = simulate(
-        lambda ydt0, t: quarter_car_model.model.ssode(
-            ydt0, t, quarter_car_model.calculate_external_forces
-        ),
-        np.array([0, -5.19672528e-03, 0, v, 0, v / r]),
-        # np.array([0, 0.0, 0, v, 0, v / r]),
-        10,
-    )
+    ydt0 = np.array([0, -5.19672528e-03, 0, v, 0, v / r])
+    true_t, true_qdt0, true_qdt1, true_qdt2 = simulate(ssode, ydt0, 10)
 
     bodies_kin, joints_kin = zip(
         *map(
@@ -168,16 +204,24 @@ if __name__ == "__main__":
     ]
     wheel_pGB = [b.p_GB for b in wheel_kin]
     wheel_vG = [b.v_G for b in wheel_kin]
+    wheel_vB = [b.v_B for b in wheel_kin]
 
     plt.figure("wheel.vel.x")
     plt.title("wheel.vel.x")
     plt.plot(true_t, [v[0] * 3.6 for v in wheel_vG])
     plt.grid()
 
-    plt.figure("wheel.ang.vel")
+    plt.figure("wheel.ang.vel_G")
     plt.plot(true_t, [v[3] for v in wheel_vG], label="ang.v.x")
     plt.plot(true_t, [v[4] for v in wheel_vG], label="ang.v.y")
     plt.plot(true_t, [v[5] for v in wheel_vG], label="ang.v.z")
+    plt.legend()
+    plt.grid()
+
+    plt.figure("wheel.ang.vel_B")
+    plt.plot(true_t, [v[3] for v in wheel_vB], label="ang.v.x")
+    plt.plot(true_t, [v[4] for v in wheel_vB], label="ang.v.y")
+    plt.plot(true_t, [v[5] for v in wheel_vB], label="ang.v.z")
     plt.legend()
     plt.grid()
 
@@ -189,6 +233,17 @@ if __name__ == "__main__":
     plt.figure("wheel.pos.x")
     plt.title("wheel.pos.x")
     plt.plot(true_t, [p.r[0] for p in wheel_pGB])
+    plt.grid()
+
+    plt.figure("Steering angle")
+    plt.title("Steering angle")
+    plt.plot(true_t, true_qdt0[:, 2], label="qdt0[2]")
+    plt.plot(true_t, [steering_function(t)[0] for t in true_t], label="steering_input")
+    plt.grid()
+
+    plt.figure("x-y pos")
+    plt.title("x-y pos")
+    plt.plot([p.r[0] for p in wheel_pGB], [p.r[1] for p in wheel_pGB])
     plt.grid()
 
     plt.show()

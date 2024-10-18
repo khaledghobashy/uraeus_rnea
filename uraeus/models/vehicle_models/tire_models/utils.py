@@ -76,7 +76,7 @@ def evaluate_tire_slips(tire_kinematics: TireKinematics) -> tuple[float, float]:
     kappa = np.clip(
         -tire_kinematics.slp_vel / (abs(tire_kinematics.lon_vel) + epsilon), -1.0, 1.0
     )
-    alpha = np.clip(
+    alpha = -np.clip(
         np.arctan2(tire_kinematics.lat_vel, abs(tire_kinematics.lon_vel) + epsilon),
         -np.pi / 2 + 0.01,
         np.pi / 2 - 0.01,
@@ -125,3 +125,42 @@ def construct_SAE_frame(
 # Sigmoid function for smooth transition
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
+
+
+if __name__ == "__main__":
+
+    from uraeus.rnea.spatial_algebra import (
+        SpatialPose,
+        quaternion_from_axis_angle,
+        quaternion_inverse,
+        express_screw,
+        quaternion_to_dcm,
+    )
+
+    terrain_normal = np.array([0, 0, 1])
+    spin_axis = np.array([0, 1, 0])
+    q_sae = construct_SAE_frame(terrain_normal, spin_axis)
+    print(q_sae)
+
+    def create_mock_kinematics(x_pos, y_pos, q_BG, vx_B, vy_B, omega_B):
+
+        q_GB = quaternion_inverse(q_BG)
+        p_GB = SpatialPose(np.array([x_pos, y_pos, 0.25]), q_GB)
+        p_BG = p_GB.inv()
+
+        v_B = np.array([vx_B, vy_B, 0, 0, omega_B, 0])
+        v_G = express_screw(p_BG, v_B)
+
+        mock_kinematics = BodyKinematics(
+            p_BG=p_BG, p_GB=p_GB, v_B=v_B, a_B=0, v_G=v_G, a_G=0
+        )
+        return mock_kinematics
+
+    q_BG = quaternion_from_axis_angle(np.radians(90), terrain_normal)
+    print("dcm = ", quaternion_to_dcm(q_BG))
+    print("q_BG = ", q_BG)
+    mock_kinematics = create_mock_kinematics(2, 2, q_BG, 20, 2, 10)
+    print(mock_kinematics)
+    spin_axis_G = transform_vector(mock_kinematics.p_BG.q, spin_axis)
+    print("spin_axis_G = ", spin_axis_G)
+    print("tire_kin = ", evaluate_tire_kinematics(mock_kinematics, 0.25))
