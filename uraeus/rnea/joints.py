@@ -1,3 +1,4 @@
+import logging
 from typing import Callable, NamedTuple, Type
 from functools import partial
 
@@ -26,10 +27,14 @@ from uraeus.rnea.mobilizers import (
     FreeMobilizer,
     RevoluteMobilizer,
     TranslationalMobilizer,
+    CylindricalMobilizer,
     PlanarMobilizer,
 )
 
 from uraeus.rnea.bodies import RigidBody
+from uraeus.utils.logging import construct_logger
+
+logger = construct_logger(__name__, logging.DEBUG)
 
 
 class JointFrames(NamedTuple):
@@ -44,8 +49,8 @@ class JointFrames(NamedTuple):
         The pose of the predecessor frame (P) in the fixed frame (F).
     """
 
-    p_SM: SpatialPose
-    p_PF: SpatialPose
+    p_MS: SpatialPose
+    p_FP: SpatialPose
 
 
 class JointKinematics(NamedTuple):
@@ -214,6 +219,11 @@ TranslationalJoint = AbstractJoint(
     coordinates_names=["z"],
 )
 
+CylindricalJoint = AbstractJoint(
+    nj=2,
+    mobilizer=CylindricalMobilizer(),
+    coordinates_names=["z", "psi"],
+)
 
 PlanarJoint = AbstractJoint(
     nj=3,
@@ -273,16 +283,20 @@ def evaluate_joint_kinematics(
     mobilizer_kinematics: MobilizerKinematics,
     joint_frames: JointFrames,
 ) -> JointKinematics:
-    p_SM = joint_frames.p_SM
-    p_PF = joint_frames.p_PF
 
-    p_FM, S_FM, v_J, a_J = mobilizer_kinematics
+    # pose p_SM, transforms from reference-frame S to reference-frame M
+    p_MS = joint_frames.p_MS
+    # pose p_PF, transforms from reference-frame p to reference-frame F
+    p_FP = joint_frames.p_FP
+    p_PF = p_FP.inv()
 
-    p_PS = p_SM.inv() @ p_FM @ p_PF
+    p_FM, S_FM, v_M, a_M = mobilizer_kinematics
+
+    p_PS = p_MS @ p_FM @ p_PF
     p_SP = p_PS.inv()
 
-    v_J = transform_screw(p_SM.inv(), v_J)
-    a_J = transform_screw(p_SM.inv(), a_J)
+    v_J = transform_screw(p_MS, v_M)
+    a_J = transform_screw(p_MS, a_M)
 
     kinematics = JointKinematics(p_FM, p_SP, p_PS, S_FM, v_J, a_J)
 
@@ -325,7 +339,7 @@ def initialize_joint(
     rot_axis = np.cross(z_axis_G, z_axis)
     if np.linalg.norm(rot_axis) != 0:
         angle = np.arccos(z_axis_G @ z_axis)
-        q_JG = quaternion_from_axis_angle(-angle, rot_axis)
+        q_JG = quaternion_from_axis_angle(angle, rot_axis)
     else:
         q_JG = np.array([1, 0, 0, 0])
 
@@ -334,32 +348,4 @@ def initialize_joint(
     p_FP = p_GP @ p_JG
     p_MS = p_GS @ p_JG
 
-    return JointFrames(p_MS.inv(), p_FP.inv())
-
-
-def orthogonal_vector(v: np.ndarray):
-    x, y, z = v
-
-    v1 = np.array([y, -x, 0])
-    v2 = np.array([-z, 0, x])
-
-    v3 = (5 * v1) + (9 * v2)
-
-    u = v3 / np.linalg.norm(v3)
-
-    return u
-
-
-def triad(v1: np.ndarray, v2: np.ndarray) -> np.ndarray:
-    k = v1 / np.linalg.norm(v1)
-    if v2 is not None:
-        i = v2 / np.linalg.norm(v2)
-    else:
-        i = orthogonal_vector(k)
-
-    j = skew_M @ k @ i
-    j = j / np.linalg.norm(j)
-
-    R = np.vstack([i, j, k]).T
-
-    return R
+    return JointFrames(p_MS, p_FP)
