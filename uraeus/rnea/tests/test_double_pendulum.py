@@ -43,7 +43,6 @@ class DoublePendulumTest(unittest.TestCase):
             self.l1, self.l2, self.m1, self.m2
         )
 
-    # @unittest.skip
     def test_forward_kinematics(self):
         time_array = np.linspace(0, 2 * np.pi, 100)
 
@@ -54,11 +53,10 @@ class DoublePendulumTest(unittest.TestCase):
         test_pose_G, test_vel_G, test_acc_G = zip(*test_sol)
         true_pose_G, true_vel_G, true_acc_G = zip(*true_sol)
 
-        np.testing.assert_almost_equal(true_pose_G, test_pose_G)
-        np.testing.assert_almost_equal(true_vel_G, test_vel_G)
-        np.testing.assert_almost_equal(true_acc_G, test_acc_G)
+        np.testing.assert_almost_equal(test_pose_G, true_pose_G)
+        np.testing.assert_almost_equal(test_vel_G, true_vel_G)
+        np.testing.assert_almost_equal(np.array(true_acc_G), test_acc_G)
 
-    # @unittest.skip
     def test_inverse_dynamics(self):
         time_array = np.linspace(0, 2 * np.pi, 100)
 
@@ -218,7 +216,6 @@ if __name__ == "__main__":
     def evaluate_multibody_forward_dynamics(model, t, ydt0):
         qdt0, qdt1 = ydt0.reshape(2, -1)
         qdt2 = model.forward_dynamics_pass(qdt0, qdt1, np.zeros_like(qdt1))
-
         return np.array([*qdt1, *qdt2])
 
     def simulate(ssode, ydt0, t_end):
@@ -243,35 +240,26 @@ if __name__ == "__main__":
 
         return time_history, qdt0_history, qdt1_history, qdt2_history
 
-    # analytical_model = AnalyticDoublePendulum(5, 5, 1, 1)
-    # true_t, true_qdt0, true_qdt1, true_qdt2 = simulate(
-    #     analytical_model.ssode, np.array([0, 0, 0, 0]), 10
-    # )
-
-    # model = DoublePendulumTest()._build_multibody_system(5, 5, 1, 1)
-    # ydt0 = np.array([0, 2, 1, 2])
-    # print(evaluate_multibody_forward_dynamics(model, 0, ydt0))
-
-    mutlibody_model = DoublePendulumTest()._build_multibody_system(5, 5, 1, 1)
+    multibody_model = DoublePendulumTest()._build_multibody_system(5, 5, 1, 1)
     test_t, test_qdt0, test_qdt1, test_qdt2 = simulate(
-        lambda t, y: evaluate_multibody_forward_dynamics(mutlibody_model, t, y),
+        lambda t, y: evaluate_multibody_forward_dynamics(multibody_model, t, y),
         np.array([np.pi / 2, 0, 0, 0]),
         5,
     )
 
     bodies_kinematics = [
-        mutlibody_model.forward_kinematics_pass(
+        multibody_model.forward_kinematics_pass(
             test_qdt0[i], test_qdt1[i], test_qdt2[i]
         )[0]
         for i in range(len(test_t))
     ]
 
     l1_kin = [
-        mutlibody_model.get_body_kinematics("l1", bodies)
+        multibody_model.get_body_kinematics("l1", bodies)
         for bodies in bodies_kinematics
     ]
     l2_kin = [
-        mutlibody_model.get_body_kinematics("l2", bodies)
+        multibody_model.get_body_kinematics("l2", bodies)
         for bodies in bodies_kinematics
     ]
 
@@ -286,25 +274,3 @@ if __name__ == "__main__":
     plt.grid()
 
     plt.show()
-
-    # plt.figure()
-    # plt.plot(test_t, [p.r[2] for p in l1_p])
-    # plt.plot(test_t, [p.r[1] for p in l1_p])
-    # plt.grid()
-
-    # plt.figure()
-    # plt.plot(test_t, [p.r[2] for p in l2_p])
-    # plt.plot(test_t, [p.r[1] for p in l2_p])
-    # plt.grid()
-
-    # plt.figure()
-    # plt.plot(test_t, [v[2] for v in l1_v])
-    # plt.plot(test_t, [v[1] for v in l1_v])
-    # plt.grid()
-
-    # plt.figure()
-    # plt.plot(test_t, [v[2] for v in l2_v])
-    # plt.plot(test_t, [v[1] for v in l2_v])
-    # plt.grid()
-
-    # plt.show()
