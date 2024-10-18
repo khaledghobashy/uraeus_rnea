@@ -262,16 +262,18 @@ if __name__ == "__main__":
     print("")
     qdt0s, qdt1s, qdt2s = kinematic_sim(numerical_model, qdt0, t_array)
 
+    upright_z = [q[3 * 7 + 2] for q in qdt0s]
+
     plt.figure("upright_x")
-    plt.plot(t_array, [q[3 * 7 + 0] for q in qdt0s])
+    plt.plot(upright_z, [q[3 * 7 + 0] for q in qdt0s])
     plt.grid()
 
     plt.figure("upright_y")
-    plt.plot(t_array, [q[3 * 7 + 1] for q in qdt0s])
+    plt.plot(upright_z, [q[3 * 7 + 1] for q in qdt0s])
     plt.grid()
 
-    plt.figure("upright_z")
-    plt.plot(t_array, [q[3 * 7 + 2] for q in qdt0s])
-    plt.grid()
+    # plt.figure("upright_z")
+    # plt.plot(upright_z, [q[3 * 7 + 2] for q in qdt0s])
+    # plt.grid()
 
     plt.show()
