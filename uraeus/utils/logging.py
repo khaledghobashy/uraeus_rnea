@@ -7,6 +7,7 @@ def construct_logger(name: str, level: int):
 
     # Create handlers
     console_handler = logging.StreamHandler()
+    file_handler = logging.FileHandler("uraeus_tmp.log")
 
     # Set level for handlers
     console_handler.setLevel(logging.DEBUG)
@@ -17,5 +18,6 @@ def construct_logger(name: str, level: int):
     )
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
+    # logger.addHandler(file_handler)
 
     return logger
