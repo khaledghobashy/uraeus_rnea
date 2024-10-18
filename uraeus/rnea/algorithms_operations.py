@@ -22,11 +22,18 @@ def evaluate_successor_kinematics(
     predecessor_kin: BodyKinematics,
     joint_kin: JointKinematics,
 ) -> BodyKinematics:
-    p_BG = predecessor_kin.p_BG @ joint_kin.p_SP
-    p_GB = p_BG.inv()
 
-    v_B = transform_screw(joint_kin.p_PS, predecessor_kin.v_B) + joint_kin.v_J
-    v_GB = express_screw(p_BG, v_B)
+    # Example (4.4), Page 80
+    p_GB = joint_kin.p_PS @ predecessor_kin.p_GB
+    p_BG = p_GB.inv()
+
+    # Spatial velocity of successor body, relative to global inertia frame,
+    # expressed in successor frame
+    v_B = joint_kin.v_J + transform_screw(joint_kin.p_PS, predecessor_kin.v_B)
+
+    # Spatial velocity of successor body, relative to global inertia frame,
+    # expressed in global inertia frame
+    v_G = express_screw(p_BG, v_B)
 
     a_B = (
         transform_screw(joint_kin.p_PS, predecessor_kin.a_B)
@@ -34,10 +41,11 @@ def evaluate_successor_kinematics(
         + spatial_cross(v_B, joint_kin.v_J)
     )
 
+    # Extracting the classical acceleration from the spatial acceleration vector
     v_s0 = translational_spatial_vector(v_B)
-    a_GB = express_screw(p_BG, (a_B - spatial_cross(v_s0, v_B)))
+    a_G = express_screw(p_BG, (a_B - spatial_cross(v_s0, v_B)))
 
-    successor_kin = BodyKinematics(p_GB, p_BG, v_B, a_B, v_GB, a_GB)
+    successor_kin = BodyKinematics(p_GB, p_BG, v_B, a_B, v_G, a_G)
     return successor_kin
 
 
@@ -50,7 +58,7 @@ def spatial_cross(v1: np.ndarray, v2: np.ndarray) -> np.ndarray:
     v3_v = (skew_M @ v1_v @ v2_w) + (skew_M @ v1_w @ v2_v)
     v3_w = (skew_M @ v1_w) @ v2_w
 
-    return -jnp.array([*v3_v, *v3_w])
+    return jnp.array([*v3_v, *v3_w])
 
 
 @jax.jit
@@ -88,7 +96,7 @@ def evaluate_joint_inertia_force(
     fi_S_qdt2 = successor_I @ successor_kin.a_B
 
     # inertia forces from rotational velocity
-    fi_S_qdt1 = -force_spatial_cross(
+    fi_S_qdt1 = force_spatial_cross(
         successor_kin.v_B, (successor_I @ successor_kin.v_B)
     )
     # Total inertia forces
@@ -103,6 +111,7 @@ def evaluate_joint_inertia_force(
 
     fe_S = g_fe_S + l_fe_S
     fb_S = fi_S - fe_S
+
     return fb_S
 
 
@@ -122,8 +131,8 @@ def construct_mobilizer_force(
 def extract_force_components(
     fi_S: np.ndarray, joint_frames: JointFrames, joint_kin: JointKinematics
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    p_SM = joint_frames.p_SM
-    p_MS = p_SM.inv()
+    p_MS = joint_frames.p_MS
+    p_SM = p_MS.inv()
 
     fi_M = transform_screw_force(p_SM, fi_S)
     tau = joint_kin.S_FM.T @ fi_M
