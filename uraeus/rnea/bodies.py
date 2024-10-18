@@ -2,11 +2,7 @@ from typing import NamedTuple
 
 import numpy as np
 
-from uraeus.rnea.spatial_algebra import (
-    SpatialPose,
-    transform_vector,
-    quaternion_inverse,
-)
+from uraeus.rnea.spatial_algebra import SpatialPose, quaternion_inverse
 
 
 class RigidBodyData(NamedTuple):
@@ -53,8 +49,8 @@ def get_initialized_body_kinematics(r: np.ndarray, q_BG: np.ndarray) -> BodyKine
     # r: position vector of body relative to global-origin expressed in global frame
     # q_BG transforms from body from to global frame
 
-    p_BG = SpatialPose(transform_vector(quaternion_inverse(q_BG), -r), q_BG)
-    p_GB = p_BG.inv()
+    p_GB = SpatialPose(r, quaternion_inverse(q_BG))
+    p_BG = p_GB.inv()
 
     zeros = np.zeros((6,))
 
