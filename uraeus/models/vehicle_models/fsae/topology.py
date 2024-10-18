@@ -8,6 +8,7 @@ from uraeus.rnea.joints import (
     JointConfigInputs,
     RevoluteJoint,
     TranslationalJoint,
+    CylindricalJoint,
 )
 
 from uraeus.rnea.topologies import MultiBodyTree
@@ -325,7 +326,7 @@ def construct_multibodytree(vehicle_data: VehicleData) -> MultiBodyTree:
         predecessor="chassis",
         successor="fr_carier",
         succ_data=bodies_data.fr_carier,
-        joint_type=RightSuspensionJoint,
+        joint_type=CylindricalJoint,
         joint_data=joints_data.fr_susp,
     )
 
@@ -334,7 +335,7 @@ def construct_multibodytree(vehicle_data: VehicleData) -> MultiBodyTree:
         predecessor="chassis",
         successor="fl_carier",
         succ_data=bodies_data.fl_carier,
-        joint_type=LeftSuspensionJoint,
+        joint_type=CylindricalJoint,
         joint_data=joints_data.fl_susp,
     )
 
@@ -343,7 +344,7 @@ def construct_multibodytree(vehicle_data: VehicleData) -> MultiBodyTree:
         predecessor="chassis",
         successor="rr_carier",
         succ_data=bodies_data.rr_carier,
-        joint_type=RightSuspensionJoint,
+        joint_type=TranslationalJoint,
         joint_data=joints_data.rr_susp,
     )
 
@@ -352,7 +353,7 @@ def construct_multibodytree(vehicle_data: VehicleData) -> MultiBodyTree:
         predecessor="chassis",
         successor="rl_carier",
         succ_data=bodies_data.rl_carier,
-        joint_type=LeftSuspensionJoint,
+        joint_type=TranslationalJoint,
         joint_data=joints_data.rl_susp,
     )
 

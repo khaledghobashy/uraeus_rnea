@@ -36,7 +36,7 @@ class AeroForce(object):
         aero_down = aero_force(self.cl, self.frontal_area, vel_x)
 
         local_frc_vec = np.array([-aero_drag, 0, -aero_down])
-        local_trq_vec = skew_M @ local_frc_vec @ self.local_pos
+        local_trq_vec = -skew_M @ local_frc_vec @ self.local_pos
 
         spatial_force_vec = np.hstack([local_frc_vec, local_trq_vec])
         return spatial_force_vec

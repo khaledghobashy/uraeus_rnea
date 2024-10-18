@@ -3,6 +3,7 @@ import logging
 import numpy as np
 import matplotlib.pyplot as plt
 
+from uraeus.rnea.spatial_algebra import quaternion_to_yaw
 from uraeus.models.vehicle_models.fsae.topology import (
     ChassisData,
     WheelData,
@@ -10,9 +11,9 @@ from uraeus.models.vehicle_models.fsae.topology import (
     VehicleData,
     construct_multibodytree,
 )
-from uraeus.rnea.topologies import Model
+from uraeus.rnea.topologies import Model, HybridModel
 from uraeus.models.vehicle_models.fsae.simulations import (
-    static_equilibrium,
+    solve_for_static_equilibrium,
     acceleration_sim,
     standing_sim,
 )
@@ -45,14 +46,18 @@ vehicle_data = VehicleData(
 )
 
 topology = construct_multibodytree(vehicle_data)
-model = Model(topology)
+# model = Model(topology)
+model = HybridModel(topology, id_coordinates=[7, 9])
 model.vehicle_data = vehicle_data
-
+print(model.hybrid_dynamics_data.permutation_matrix.shape)
+print(model.n)
+print(model.tree_data.qdt0_names)
 if __name__ == "__main__":
-    print(static_equilibrium(model, 0 / 3.6))
-
+    system_inputs = {"throttle": 0, "steering_input": 0}
+    print(solve_for_static_equilibrium(model, u0=system_inputs, vx=0 / 3.6))
+    # exit()
     # res = standing_sim(model)
-    res = acceleration_sim(model, 0, 10)
+    res = acceleration_sim(model, u0=system_inputs, v0=30 / 3.6, tf=20)
 
     bodies_kinematics = [
         model.forward_kinematics_pass(
@@ -65,20 +70,38 @@ if __name__ == "__main__":
         model.get_body_kinematics("chassis", bodies) for bodies in bodies_kinematics
     ]
 
-    chassis_p = [kin.p_GB for kin in chassis_kin]
+    chassis_p_GB = [kin.p_GB for kin in chassis_kin]
+    chassis_p_BG = [kin.p_BG for kin in chassis_kin]
     chassis_v = [kin.v_B for kin in chassis_kin]
     chassis_a = [kin.a_B for kin in chassis_kin]
 
     plt.figure("chassis_z.png")
-    plt.plot(res.time_history, [p.r[2] for p in chassis_p])
+    plt.plot(res.time_history, [p.r[2] for p in chassis_p_GB])
+    plt.grid()
+
+    plt.figure("Vehicle yaw")
+    plt.plot(res.time_history, res.qdt0_history[:, 5], label="free.yaw")
+    plt.plot(
+        res.time_history,
+        [quaternion_to_yaw(p.q) for p in chassis_p_BG],
+        label="chassis.yaw",
+    )
+    plt.legend()
+    plt.grid()
+
+    plt.figure("x-y pos")
+    plt.title("x-y pos")
+    plt.plot([p.r[0] for p in chassis_p_GB], [p.r[1] for p in chassis_p_GB], label="GB")
+    plt.plot([p.r[0] for p in chassis_p_BG], [p.r[1] for p in chassis_p_BG], label="BG")
+    plt.legend()
     plt.grid()
 
     plt.figure("chassis_x.png")
-    plt.plot(res.time_history, [p.r[0] for p in chassis_p])
+    plt.plot(res.time_history, [p.r[0] for p in chassis_p_GB])
     plt.grid()
 
     plt.figure("chassis_y.png")
-    plt.plot(res.time_history, [p.r[1] for p in chassis_p])
+    plt.plot(res.time_history, [p.r[1] for p in chassis_p_GB])
     plt.grid()
 
     plt.figure("chassis_z_vel.png")
@@ -93,15 +116,28 @@ if __name__ == "__main__":
     plt.plot(res.time_history, [p[0] / 9.81 for p in chassis_a])
     plt.grid()
 
-    # plt.figure("fr_wheel_z.png")
-    # plt.plot(res.time_history, y[:, 6])
-    # plt.grid()
-
     plt.figure("wheels_omega.png")
-    plt.plot(res.time_history, res.qdt1_history[:, 10])
-    plt.plot(res.time_history, res.qdt1_history[:, 11])
-    plt.plot(res.time_history, res.qdt1_history[:, 12])
-    plt.plot(res.time_history, res.qdt1_history[:, 13])
+    plt.plot(
+        res.time_history,
+        res.qdt1_history[:, model.tree_data.qdt0_names.fr_wheel_rev.psi],
+        label="fr_wheel",
+    )
+    plt.plot(
+        res.time_history,
+        res.qdt1_history[:, model.tree_data.qdt0_names.fl_wheel_rev.psi],
+        label="fl_wheel",
+    )
+    plt.plot(
+        res.time_history,
+        res.qdt1_history[:, model.tree_data.qdt0_names.rr_wheel_rev.psi],
+        label="rr_wheel",
+    )
+    plt.plot(
+        res.time_history,
+        res.qdt1_history[:, model.tree_data.qdt0_names.rl_wheel_rev.psi],
+        label="rl_wheel",
+    )
+    plt.legend()
     plt.grid()
 
     plt.show()
