@@ -144,7 +144,7 @@ def evaluate_tau(
     joints_kinematics: list[JointKinematics],
     joints_forces: list[np.ndarray],
 ) -> np.ndarray:
-    forces_transforms_p_SM = [j.p_SM for j in joints_frames]
+    forces_transforms_p_SM = [j.p_MS.inv() for j in joints_frames]
     fi_Ms = list(map(transform_screw_force, forces_transforms_p_SM, joints_forces))
     taus = map(jnp.dot, [j.S_FM.T for j in joints_kinematics], fi_Ms)
     tau = jnp.hstack(list(taus))
