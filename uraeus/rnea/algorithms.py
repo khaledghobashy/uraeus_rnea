@@ -1,3 +1,4 @@
+import logging
 from functools import partial
 from operator import sub
 from typing import Iterable, NamedTuple
@@ -7,6 +8,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from uraeus.utils.logging import construct_logger
 from uraeus.rnea.bodies import BodyKinematics
 from uraeus.rnea.joints import JointKinematics, FunctionalJoint
 from uraeus.rnea.spatial_algebra import (
@@ -24,6 +26,8 @@ from uraeus.rnea.tree_traversals import (
     SystemForces,
 )
 
+logger = construct_logger(__name__, logging.DEBUG)
+
 
 @partial(jax.jit, static_argnums=(0,))
 def split_coordinates(
@@ -40,11 +44,34 @@ class MultiBodyData(NamedTuple):
     bodies_inertias: list[np.ndarray]
     forward_traversal: tuple[tuple[int, int, int], ...]
     backward_traversal: list[tuple[int, list[int]]]
-    qdt0_idx: tuple[int]
-    qdt1_idx: tuple[int]
+    qdt0_idx: tuple[int, ...]
+    qdt1_idx: tuple[int, ...]
+    qdt0_names: NamedTuple
 
     def __hash__(self):
         return hash(self.__class__.__name__)
+
+
+def get_qdt1_from_udt0(
+    tree_data: MultiBodyData, qdt0: np.ndarray, udt0: np.ndarray
+) -> np.ndarray:
+    qdt0s, udt0s, _ = zip(*split_coordinates(tree_data.qdt0_idx, qdt0, udt0, qdt0))
+    qdt1 = [
+        j.mobilizer.N(qdt0_j) @ udt0_j
+        for j, qdt0_j, udt0_j in zip(tree_data.joints, qdt0s, udt0s)
+    ]
+    return jnp.hstack(qdt1)
+
+
+def get_udt0_from_qdt1(
+    tree_data: MultiBodyData, qdt0: np.ndarray, udt0: np.ndarray
+) -> np.ndarray:
+    qdt0s, udt0s, _ = zip(*split_coordinates(tree_data.qdt0_idx, qdt0, udt0, qdt0))
+    qdt1 = [
+        j.mobilizer.N(qdt0_j).T @ udt0_j
+        for j, qdt0_j, udt0_j in zip(tree_data.joints, qdt0s, udt0s)
+    ]
+    return jnp.hstack(qdt1)
 
 
 class HybridDynamicsData(NamedTuple):
@@ -168,7 +195,7 @@ class JointInertiaMatrixOperations(NamedTuple):
         )
         a_J_mob = [j.mobilizer.a_J(*qs) for j, qs in zip(tree_data.joints, coordinates)]
         a_J_jnt = [
-            transform_screw(j.frames.p_SM.inv(), a_J)
+            transform_screw(j.frames.p_MS, a_J)
             for j, a_J in zip(tree_data.joints, a_J_mob)
         ]
         new_kin = [
@@ -208,6 +235,34 @@ class HybridDynamics(object):
         qdt1: np.ndarray,
         qdt2_id: np.ndarray,
     ) -> IDCallRes:
+        """Evaluate C' following Eqn (9.3), page 173. Physically, C' is the force
+        required to impart zero acceleration to each forward-dynamics joint and
+        the given acceleration to each inverse-dynamics joint.
+        C' = ID(qdt0, qdt1, Q.T @ [0, qdt2_fd].T)
+
+        Parameters
+        ----------
+        hybrid_data : HybridDynamicsData
+            Container for the permutation matrix, Q,  and other attributes
+            relevant for the hybrid-system
+        external_forces : SystemForces
+            External forces applied on the system.
+        qdt0 : np.ndarray
+            Position coordinates of the system joints (inverse and forward)
+        qdt1 : np.ndarray
+            Velocity coordinates of the system joints (inverse and forward)
+        qdt2_id : np.ndarray
+            Acceleration coordinates of the inverse-dynamics joints
+
+        Returns
+        -------
+        IDCallRes
+            Inverse-dynamics return object
+
+        References
+        ----------
+        Featherstone 2008 - Rigid-body dynamics algorithms
+        """
         n_fd = hybrid_data.n_fd
         Q = hybrid_data.permutation_matrix
         qdt2 = Q.T @ jnp.hstack([np.zeros((n_fd,)), qdt2_id])
@@ -227,6 +282,34 @@ class HybridDynamics(object):
         qdt2_id: np.ndarray,
         tau_fd: np.ndarray,
     ) -> np.ndarray:
+        """Solving for the generalized accelerations of the forward-dynamics
+        joints, qdt2_fd, following Eqn (9.2), page 173, using the provided
+        algorithm:
+            1- Calculate C', using Eqn (9.3)
+            2- Calculate H11.
+            3- Solve H11 @ qdt2_fd = tau_fd - C'fd for qdt2_fd
+
+        Parameters
+        ----------
+        hybrid_data : HybridDynamicsData
+            Container for the permutation matrix, Q,  and other attributes
+            relevant for the hybrid-system
+        external_forces : SystemForces
+            External forces applied on the system.
+        qdt0 : np.ndarray
+            Position coordinates of the system joints (inverse and forward)
+        qdt1 : np.ndarray
+            Velocity coordinates of the system joints (inverse and forward)
+        qdt2_id : np.ndarray
+            Acceleration coordinates of the inverse-dynamics joints
+        tau_fd : np.ndarray
+            Applied generalized forces to the forward-dynamics joints
+
+        Returns
+        -------
+        np.ndarray
+            Generalized accelerations for the forward-dynamics joints
+        """
         n_fd = hybrid_data.n_fd
         Q = hybrid_data.permutation_matrix
 
