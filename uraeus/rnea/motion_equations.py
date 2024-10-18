@@ -164,6 +164,30 @@ class TranslationalPolynomials(AbstractMotionEquations):
         return pose_states_jacobian_dt1
 
 
+class CylindricalPolynomials(AbstractMotionEquations):
+    """
+    Motion equations for a cylindrical joint.
+    """
+
+    nj = 1
+
+    @staticmethod
+    def pose_polynomials(qdt0: np.ndarray):
+        z, psi = qdt0
+        pose_states = jnp.array([0, 0, z, 0, 0, psi])
+        return pose_states
+
+    @staticmethod
+    def pose_jacobian_dt0(qdt0: np.ndarray):
+        pose_states_jacobian = np.array([0, 0, 1, 0, 0, 1])[:, None]
+        return pose_states_jacobian
+
+    @staticmethod
+    def pose_jacobian_dt1(qdt0: np.ndarray, qdt1: np.ndarray):
+        pose_states_jacobian_dt1 = np.zeros((6, 1))
+        return pose_states_jacobian_dt1
+
+
 class PlanarPolynomials(AbstractMotionEquations):
     """
     Motion equations for a Planar joint.
