@@ -147,7 +147,7 @@ def skew_matrix(v: np.ndarray) -> np.ndarray:
         A (3, 3) np.array
     """
 
-    return v @ skew_M
+    return skew_M @ v
 
 
 def E(p: np.ndarray) -> np.ndarray:
