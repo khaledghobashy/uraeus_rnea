@@ -1,5 +1,6 @@
 from __future__ import annotations
 import itertools
+import functools
 
 import jax
 from jax.tree_util import register_pytree_node_class
@@ -74,12 +75,14 @@ def levi_cevita_tensor(len: int) -> np.ndarray:
     return arr
 
 
-skew_M = levi_cevita_tensor(3)
+skew_M = -levi_cevita_tensor(3)
 
 
 @jax.jit
 def rot_x(theta: float) -> jnp.ndarray:
-    """Generates a rotation matrix for a rotation around the x-axis.
+    """Generates a transformation matrix from a rotation around the x-axis.
+    - This applies a transformation on the given matrix/vector back to its
+    original orientation.
 
     Parameters
     ----------
@@ -100,7 +103,7 @@ def rot_x(theta: float) -> jnp.ndarray:
 
 @jax.jit
 def rot_y(theta: float) -> jnp.ndarray:
-    """Generates a rotation matrix for a rotation around the y-axis.
+    """Generates a transformation matrix from a rotation around the y-axis.
 
     Parameters
     ----------
@@ -121,7 +124,7 @@ def rot_y(theta: float) -> jnp.ndarray:
 
 @jax.jit
 def rot_z(theta: float) -> jnp.ndarray:
-    """Generates a rotation matrix for a rotation around the z-axis.
+    """Generates a transformation matrix from a rotation around the z-axis.
 
     Parameters
     ----------
@@ -138,6 +141,13 @@ def rot_z(theta: float) -> jnp.ndarray:
 
     mat = jnp.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
     return mat
+
+
+def yaw_pitch_roll_intrinsic_rotation(
+    yaw: float, pitch: float, roll: float
+) -> np.ndarray:
+    R = rot_z(yaw) @ rot_y(pitch) @ rot_x(roll)
+    return R
 
 
 @jax.jit
@@ -168,9 +178,36 @@ def quaternion_multiply(q1, q2):
     return normalize(final_quaternion)
 
 
-def transform_vector(pdt0F_G: np.ndarray, u_F: np.ndarray):
-    """
-    Transforms a vector using a given pose transformation.
+# def transform_vector(pdt0F_G: np.ndarray, u_F: np.ndarray):
+#     """Transforms a vector using a given pose transformation.
+
+#     Parameters
+#     ----------
+#     pdt0F_G : np.ndarray
+#         The pose transformation as a 4-element array, where the first element is
+#         the scalar part (w) and the remaining three elements are the vector part
+#         (v).
+#     u_F : np.ndarray
+#         The vector to be transformed as a 3-element array.
+
+#     Returns
+#     -------
+#     jnp.ndarray
+#         The transformed vector as a 3-element array.
+#     """
+#     w, v = jnp.split(pdt0F_G, [1])
+
+#     uF_G = (
+#         (w**2 * u_F)
+#         + (2 * w * (skew_M @ v @ u_F))
+#         + (2 * (v @ u_F) * v)
+#         - ((v @ v) * u_F)
+#     )
+#     return uF_G
+
+
+def transform_vector(q_AB: np.ndarray, u_A: np.ndarray):
+    """Transforms a vector using a given pose transformation.
 
     Parameters
     ----------
@@ -186,15 +223,8 @@ def transform_vector(pdt0F_G: np.ndarray, u_F: np.ndarray):
     jnp.ndarray
         The transformed vector as a 3-element array.
     """
-    w, v = jnp.split(pdt0F_G, [1])
-
-    uF_G = (
-        (w**2 * u_F)
-        + (2 * w * (skew_M @ v @ u_F))
-        + (2 * (v @ u_F) * v)
-        - ((v @ v) * u_F)
-    )
-    return uF_G
+    u_B = quaternion_to_dcm(q_AB) @ u_A
+    return u_B
 
 
 @register_pytree_node_class
@@ -238,11 +268,9 @@ class SpatialPose(object):
         SpatialPose
             The resulting combined pose.
         """
-        new_q = quaternion_multiply(other.q, self.q)
-        self_r_in_other = transform_vector(other.inv().q, self.r)
-        new_r_in_self = self_r_in_other + other.r
+        new_q = quaternion_multiply(self.q, other.q)
+        new_r_in_self = other.r + transform_vector(quaternion_inverse(other.q), self.r)
         new_pose = SpatialPose(new_r_in_self, new_q)
-
         return new_pose
 
     def inv(self):
@@ -334,7 +362,7 @@ def transform_screw(pose: SpatialPose, screw: np.ndarray) -> np.ndarray:
     """
     v, w = jnp.split(screw, 2)
     new_w = transform_vector(pose.q, w)
-    new_v = transform_vector(pose.q, v + (skew_M @ pose.r) @ w)
+    new_v = transform_vector(pose.q, v + (skew_M @ w) @ pose.r)
     new_screw = jnp.array([*new_v, *new_w])
     return new_screw
 
@@ -360,12 +388,12 @@ def transform_screw_force(pose: SpatialPose, screw: np.ndarray) -> np.ndarray:
         The transformed screw vector as a 6-element array.
     """
     force, torque = jnp.split(screw, 2)
-    new_w = transform_vector(pose.q, torque) + transform_vector(
-        pose.q, ((skew_M @ pose.r) @ force)
+    transformed_torque = transform_vector(pose.q, torque) + transform_vector(
+        pose.q, ((-skew_M @ pose.r) @ force)
     )
-    new_v = transform_vector(pose.q, force)
+    transformed_forces = transform_vector(pose.q, force)
 
-    new_screw = jnp.array([*new_v, *new_w])
+    new_screw = jnp.array([*transformed_forces, *transformed_torque])
     return new_screw
 
 
@@ -398,9 +426,34 @@ def normalize(v):
     return v / jnp.sqrt(v @ v)
 
 
-def euler_to_quaternion(roll, pitch, yaw):
+@jax.jit
+def quaternion_from_axis_angle(angle: float, axis: np.ndarray):
+    """Converts an axis-angle representation to a quaternion.
+    This returns a reference-frame that is rotated by the given angle around
+    the given axis, from the identity reference-frame.
+
+    Parameters
+    ----------
+    angle : float
+        The rotation angle in radians.
+    axis : np.ndarray
+        The rotation axis as a 3-element array.
+
+    Returns
+    -------
+    jnp.ndarray
+        The resulting quaternion as a 4-element array.
     """
-    Converts Euler angles (in radians) to a quaternion.
+    axis = normalize(axis)
+    c = jnp.cos(0.5 * angle)
+    s = jnp.sin(0.5 * angle)
+    return jnp.array([c, *(s * axis)])
+
+
+def quaternion_from_euler_angles(roll, pitch, yaw):
+    """Converts Euler angles (in radians) to a quaternion.
+    This returns a reference-frame that is rotated by the given euler-angles
+    around their corresponding axes, from the identity reference-frame.
 
     Args:
         roll (float): Rotation around the x-axis (roll angle).
@@ -425,7 +478,7 @@ def euler_to_quaternion(roll, pitch, yaw):
     return normalize(jnp.array([qw, qx, qy, qz]))
 
 
-def dcm_to_quaternion(dcm):
+def quaternion_from_dcm(dcm):
     """
     Converts a Direction Cosine Matrix (DCM) to a quaternion.
 
@@ -465,26 +518,23 @@ def dcm_to_quaternion(dcm):
     return q / jnp.linalg.norm(q)
 
 
-@jax.jit
-def quaternion_from_axis_angle(angle: float, axis: np.ndarray):
-    """Converts an axis-angle representation to a quaternion.
+def quaternion_to_yaw(q: np.ndarray):
+    """Extract yaw angle (rotation around the z-axis) from a quaternion.
 
     Parameters
     ----------
-    angle : float
-        The rotation angle in radians.
-    axis : np.ndarray
-        The rotation axis as a 3-element array.
+    q : ndarray
+        array of 4 elements, holding w, x, y, and z of the quaternion.
 
     Returns
     -------
-    jnp.ndarray
-        The resulting quaternion as a 4-element array.
+    float
+        The yaw angle in radians.
     """
-    axis = normalize(axis)
-    c = jnp.cos(0.5 * angle)
-    s = jnp.sin(0.5 * angle)
-    return jnp.array([c, *(s * axis)])
+    w, x, y, z = q
+    # Calculate the yaw angle
+    yaw = np.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
+    return yaw
 
 
 @jax.jit
