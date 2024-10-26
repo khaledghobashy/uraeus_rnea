@@ -340,6 +340,131 @@ class SpatialPose(object):
         return SpatialPose(np.zeros(3), np.array([1, 0, 0, 0]))
 
 
+@register_pytree_node_class
+class SpatialInertia(object):
+    # Mass of rigid body
+    m: float
+    # Inertia tensor of rigid body
+    J: np.ndarray
+    # Offset of center of gravity from the body reference frame
+    d: np.ndarray
+
+    def __init__(self, m: float, J: np.ndarray, d: np.ndarray):
+        self.m = m
+        self.J = J
+        self.d = d
+
+    def __add__(self, other):
+        # New mass is simply the sum of the two masses
+        new_m = self.m + other.m
+
+        # New position vector of the center-of-mass is the weighted average
+        # of the each SpatialInertia center-of-mass
+        new_d = (1 / new_m) * ((self.m * self.d) + (other.m * other.d))
+
+        # Assuming both, self and other, has their inertia tensor evaluated at
+        # self's origin, and expressed in same reference frame, and the new
+        # inertia tensor is to be evaluated at the same point and expressed in
+        # same reference frame
+        new_J = self.J + other.J
+
+        return SpatialInertia(new_m, new_J, new_d)
+
+    def as_spatial_matrix(self):
+        coupling_term = self.m * (skew_M @ self.d)
+        spatial_inertia_matrix = jnp.vstack(
+            [
+                jnp.hstack([self.m * np.eye(3), -coupling_term]),
+                jnp.hstack([coupling_term, self.J]),
+            ]
+        )
+        return spatial_inertia_matrix
+
+    def tree_flatten(self):
+        """
+        Flattens the pose for JAX tree operations.
+
+        Returns
+        -------
+        tuple
+            Flattened pose.
+        """
+        return ((self.m, self.J, self.d), None)
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, args):
+        """
+        Unflattens the pose for JAX tree operations.
+
+        Parameters
+        ----------
+        aux_data : None
+            Auxiliary data (not used).
+        args : tuple
+            Flattened pose data.
+
+        Returns
+        -------
+        SpatialPose
+            The unflattened pose.
+        """
+        return cls(*args)
+
+    @staticmethod
+    def Identity() -> SpatialInertia:
+        """
+        Creates an identity SpatialInertia.
+
+        Returns
+        -------
+        SpatialInertia
+            The identity inertia.
+        """
+        return SpatialInertia(0, np.zeros((3, 3)), np.zeros((3,)))
+
+    def __repr__(self) -> str:
+        """
+        Returns a string representation of the pose.
+
+        Returns
+        -------
+        str
+            String representation of the pose.
+        """
+        return f"SpatialInertia(\n\tm({self.m})\n\tJ({self.J})\n\td({self.d})\n)\n"
+
+
+def transform_spatial_inertia(p_SP: SpatialPose, i_S: SpatialInertia):
+
+    # Re-expressing i_S in P frame using pose p_SP
+    # --------------------------------------------
+    # Extracting rotation matrix from the given pose quaternion
+    E_SP = quaternion_to_dcm(p_SP.q)
+
+    # Re-expressing i_S.J in P frame using rotation matrix E_SP
+    J_P = E_SP @ i_S.J @ E_SP.T
+
+    # Re-expressing i_S.d in P frame using rotation matrix E_SP
+    d_P = E_SP @ i_S.d
+
+    # Shifting [i_S]_P to the origin of P frame
+    # -----------------------------------------
+    # New offset distance, d_new_P, relative position vector between origin of
+    # frame P, and center of mass of i_S -> [d_new]_P = [p_SP.r]_P + [d]_P
+    d_new_P = p_SP.inv().r + d_P
+
+    # Inertia tensor at point (p), origin of frame p, expressed in P frame,
+    # [J_p]_P = [J_s]_P - (d_P)^2 + (d_new_P)^2
+    d_P_cross = skew_M @ d_P
+    d_new_P_cross = skew_M @ d_new_P
+    J_pP = J_P + i_S.m * (
+        -(d_P_cross.T @ d_P_cross) + (d_new_P_cross.T @ d_new_P_cross)
+    )
+
+    new_inertia = SpatialInertia(i_S.m, J_pP, d_new_P)
+    return new_inertia
+
+
 @jax.jit
 def transform_screw(pose: SpatialPose, screw: np.ndarray) -> np.ndarray:
     """Transforms a screw vector to a new coordinate frame defined by the given
