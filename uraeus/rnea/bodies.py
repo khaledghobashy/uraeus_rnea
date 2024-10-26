@@ -2,7 +2,7 @@ from typing import NamedTuple
 
 import numpy as np
 
-from uraeus.rnea.spatial_algebra import SpatialPose, quaternion_inverse
+from uraeus.rnea.spatial_algebra import SpatialPose, quaternion_inverse, SpatialInertia
 
 
 class RigidBodyData(NamedTuple):
@@ -11,6 +11,7 @@ class RigidBodyData(NamedTuple):
     orientation: np.ndarray = np.array([1.0, 0.0, 0.0, 0.0])
     mass: float = 0.0
     inertia_tensor: np.ndarray = np.zeros((3, 3))
+    spatial_inertia: SpatialInertia = SpatialInertia.Identity()
 
 
 class BodyKinematics(NamedTuple):
