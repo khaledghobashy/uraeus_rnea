@@ -11,7 +11,7 @@ from uraeus.rnea.joints import (
     RevoluteJoint,
     CylindricalJoint,
 )
-from uraeus.rnea.topologies import (
+from uraeus.rnea.multibody_models import (
     MultiBodyTree,
     Model,
     HybridModel,

@@ -6,7 +6,7 @@ import jax
 
 from uraeus.rnea.bodies import RigidBodyData
 from uraeus.rnea.joints import JointConfigInputs, RevoluteJoint
-from uraeus.rnea.topologies import MultiBodyTree, Model
+from uraeus.rnea.multibody_models import MultiBodyTree, Model
 from uraeus.rnea.algorithms import IDCallRes
 from uraeus.rnea.models.analytic_double_pendulum import (
     AnalyticDoublePendulum,
@@ -25,8 +25,8 @@ class DoublePendulumTest(unittest.TestCase):
         self.l1 = 7
         self.l2 = 13
 
-        self.m1 = 1
-        self.m2 = 1
+        self.m1 = 4
+        self.m2 = 2
 
         self.theta1_dt0_f = lambda t: 2 * jnp.sin(t)
         self.theta2_dt0_f = lambda t: 1.5 * jnp.sin(2 * t)
