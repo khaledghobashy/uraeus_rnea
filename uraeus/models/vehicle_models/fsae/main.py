@@ -11,7 +11,7 @@ from uraeus.models.vehicle_models.fsae.topology import (
     VehicleData,
     construct_multibodytree,
 )
-from uraeus.rnea.topologies import Model, HybridModel
+from uraeus.rnea.multibody_models import Model, HybridModel
 from uraeus.models.vehicle_models.fsae.simulations import (
     solve_for_static_equilibrium,
     acceleration_sim,

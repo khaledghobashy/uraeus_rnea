@@ -10,10 +10,11 @@ from uraeus.rnea.algorithms import (
     split_coordinates,
     ext_forces_to_gen_forces,
 )
-from uraeus.rnea.topologies import (
+
+from uraeus.rnea.multibody_models import (
     Model,
-    construct_system_forces_from_dict,
     HybridModel,
+    construct_system_forces_from_dict,
     reconstruct_system_coordinates,
 )
 from uraeus.models.vehicle_models.fsae.external_systems import (
@@ -66,7 +67,7 @@ def static_equilibrium_func(
 
     coordinates = split_coordinates(model.tree_data.qdt0_idx, qdt0, qdt1, qdt2)
     _, joints_kin = base_to_tip(
-        model.tree_data.joints, coordinates, model.tree_data.forward_traversal
+        model.tree_data.joints, coordinates, model.tree_data.graph_data.base_to_tip
     )
 
     tau, ext_forces = evaluate_force_inputs(model, 0, ydt0, u0)

@@ -3,7 +3,7 @@ from typing import NamedTuple
 
 import numpy as np
 
-from uraeus.rnea.topologies import Model, reconstruct_system_coordinates
+from uraeus.rnea.multibody_models import Model, reconstruct_system_coordinates
 from uraeus.models.vehicle_models.tire_models.brush_model import (
     BrushModelParameters,
     BrushTireModel,
