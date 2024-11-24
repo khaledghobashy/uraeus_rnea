@@ -43,10 +43,10 @@ class ForcesElements(NamedTuple):
         cz=15e3,
         kv_low=0,
     )
-    fr_tire = BrushTireModel(_tire_parameters)
-    fl_tire = BrushTireModel(_tire_parameters)
-    rr_tire = BrushTireModel(_tire_parameters)
-    rl_tire = BrushTireModel(_tire_parameters)
+    fr_tire = BrushTireModel(_tire_parameters, use_cpm_model=True)
+    fl_tire = BrushTireModel(_tire_parameters, use_cpm_model=True)
+    rr_tire = BrushTireModel(_tire_parameters, use_cpm_model=True)
+    rl_tire = BrushTireModel(_tire_parameters, use_cpm_model=True)
 
     motor = SimpleElectricMotor(
         name="rl_motor",
@@ -85,79 +85,179 @@ def evaluate_motion_inputs(
     return steering_function(u["steering_input"])
 
 
-def evaluate_force_inputs(
-    model: Model,
-    t: float,
-    ydt0: np.ndarray,
-    u: dict[str, float],
-) -> tuple[np.ndarray, dict[str, dict[str, np.ndarray]]]:
+def mask_array_elements(indices: list, array: np.ndarray):
+    new_array = array.copy()
+    new_array[indices] = 0
+    return new_array
 
-    qdt0, qdt1 = ydt0.reshape(2, -1)
-    qdt2 = 0 * qdt1
 
-    tau = np.zeros_like(qdt0)
+class AccelerationCallables(object):
 
-    forces_map = model.forces_map
+    @staticmethod
+    def construct_inputs_dict(t: float):
+        steering = 0
+        throttle = 1 if t > 1 else 0
+        inputs = {"throttle": throttle, "steering_input": steering}
+        return inputs
 
-    bodies_kinematics, _ = model.forward_kinematics_pass(qdt0, qdt1, qdt2)
-    chassis_kin = model.get_body_kinematics("chassis", bodies_kinematics)
+    @staticmethod
+    def evaluate_motion_inputs(
+        model: Model, t: float, ydt0: np.ndarray, u: dict[str, float]
+    ):
+        return steering_function(0)
 
-    # logger.debug("chassis_kin = %s", chassis_kin)
+    @staticmethod
+    def evaluate_force_inputs(
+        model: Model,
+        t: float,
+        ydt0: np.ndarray,
+        u: dict[str, float],
+    ) -> tuple[np.ndarray, dict[str, dict[str, np.ndarray]]]:
 
-    fr_wheel_kin = model.get_body_kinematics("fr_wheel", bodies_kinematics)
-    fl_wheel_kin = model.get_body_kinematics("fl_wheel", bodies_kinematics)
-    rr_wheel_kin = model.get_body_kinematics("rr_wheel", bodies_kinematics)
-    rl_wheel_kin = model.get_body_kinematics("rl_wheel", bodies_kinematics)
+        qdt0, qdt1 = ydt0.reshape(2, -1)
+        qdt2 = 0 * qdt1
 
-    fr_tire_force = ForcesElements.fr_tire(fr_wheel_kin, t)
-    fl_tire_force = ForcesElements.fl_tire(fl_wheel_kin, t)
-    rr_tire_force = ForcesElements.rr_tire(rr_wheel_kin, t)
-    rl_tire_force = ForcesElements.rl_tire(rl_wheel_kin, t)
+        tau = np.zeros_like(qdt0)
 
-    forces_map["chassis"]["local"]["aero"] = ForcesElements.aero_force(chassis_kin)
-    # forces_map["chassis"]["local"]["thrust"] = np.array(
-    #     [0.5 * 9.81 * 250, 0, 0, 0, 0, 0]
-    # )
+        forces_map = model.forces_map
 
-    forces_map["fr_wheel"]["global"]["tire"] = fr_tire_force
-    forces_map["fl_wheel"]["global"]["tire"] = fl_tire_force
-    forces_map["rr_wheel"]["global"]["tire"] = rr_tire_force
-    forces_map["rl_wheel"]["global"]["tire"] = rl_tire_force
+        bodies_kinematics, _ = model.forward_kinematics_pass(qdt0, qdt1, qdt2)
+        chassis_kin = model.get_body_kinematics("chassis", bodies_kinematics)
 
-    tau[model.tree_data.qdt0_names.fr_susp.z] = ForcesElements.fr_spring(
-        qdt0[model.tree_data.qdt0_names.fr_susp.z],
-        qdt1[model.tree_data.qdt0_names.fr_susp.z],
-    )
-    tau[model.tree_data.qdt0_names.fl_susp.z] = ForcesElements.fl_spring(
-        qdt0[model.tree_data.qdt0_names.fl_susp.z],
-        qdt1[model.tree_data.qdt0_names.fl_susp.z],
-    )
-    tau[model.tree_data.qdt0_names.rr_susp.z] = ForcesElements.rr_spring(
-        qdt0[model.tree_data.qdt0_names.rr_susp.z],
-        qdt1[model.tree_data.qdt0_names.rr_susp.z],
-    )
-    tau[model.tree_data.qdt0_names.rl_susp.z] = ForcesElements.rl_spring(
-        qdt0[model.tree_data.qdt0_names.rl_susp.z],
-        qdt1[model.tree_data.qdt0_names.rl_susp.z],
-    )
+        fr_wheel_kin = model.get_body_kinematics("fr_wheel", bodies_kinematics)
+        fl_wheel_kin = model.get_body_kinematics("fl_wheel", bodies_kinematics)
+        rr_wheel_kin = model.get_body_kinematics("rr_wheel", bodies_kinematics)
+        rl_wheel_kin = model.get_body_kinematics("rl_wheel", bodies_kinematics)
 
-    throttle = u["throttle"]
-    # logger.debug(f"throttle = {throttle}")
+        fr_tire_force = ForcesElements.fr_tire(fr_wheel_kin, t)
+        fl_tire_force = ForcesElements.fl_tire(fl_wheel_kin, t)
+        rr_tire_force = ForcesElements.rr_tire(rr_wheel_kin, t)
+        rl_tire_force = ForcesElements.rl_tire(rl_wheel_kin, t)
 
-    # forces_map["rr_carier"]["local"]["thrust"] = throttle * np.array(
-    #     [0.25 * 9.81 * 250, 0, 0, 0, 0, 0]
-    # )
-    # forces_map["rl_carier"]["local"]["thrust"] = throttle * np.array(
-    #     [0.25 * 9.81 * 250, 0, 0, 0, 0, 0]
-    # )
+        forces_map["chassis"]["local"]["aero"] = ForcesElements.aero_force(chassis_kin)
 
-    rr_torque = ForcesElements.motor(rr_wheel_kin, throttle)
-    rl_torque = ForcesElements.motor(rl_wheel_kin, throttle)
-    # tau[model.tree_data.qdt0_names.rr_wheel_rev.psi] = rr_torque
-    # tau[model.tree_data.qdt0_names.rl_wheel_rev.psi] = rl_torque
-    tau[-2] = rr_torque
-    tau[-1] = rl_torque
+        fr_tire_force_wheel = mask_array_elements([1], fr_tire_force)
+        fl_tire_force_wheel = mask_array_elements([1], fl_tire_force)
 
-    # logger.debug(f"tau = {tau}")
+        # forces_map["fr_wheel"]["global"]["tire"] = fr_tire_force_wheel
+        # forces_map["fl_wheel"]["global"]["tire"] = fl_tire_force_wheel
+        forces_map["fr_wheel"]["global"]["tire"] = fr_tire_force
+        forces_map["fl_wheel"]["global"]["tire"] = fl_tire_force
+        forces_map["rr_wheel"]["global"]["tire"] = rr_tire_force
+        forces_map["rl_wheel"]["global"]["tire"] = rl_tire_force
 
-    return tau, forces_map
+        tau[model.tree_data.qdt0_names.fr_susp.z] = ForcesElements.fr_spring(
+            qdt0[model.tree_data.qdt0_names.fr_susp.z],
+            qdt1[model.tree_data.qdt0_names.fr_susp.z],
+        )
+        tau[model.tree_data.qdt0_names.fl_susp.z] = ForcesElements.fl_spring(
+            qdt0[model.tree_data.qdt0_names.fl_susp.z],
+            qdt1[model.tree_data.qdt0_names.fl_susp.z],
+        )
+        tau[model.tree_data.qdt0_names.rr_susp.z] = ForcesElements.rr_spring(
+            qdt0[model.tree_data.qdt0_names.rr_susp.z],
+            qdt1[model.tree_data.qdt0_names.rr_susp.z],
+        )
+        tau[model.tree_data.qdt0_names.rl_susp.z] = ForcesElements.rl_spring(
+            qdt0[model.tree_data.qdt0_names.rl_susp.z],
+            qdt1[model.tree_data.qdt0_names.rl_susp.z],
+        )
+
+        throttle = u["throttle"]
+        # logger.debug(f"throttle = {throttle}")
+
+        # forces_map["rr_carier"]["local"]["thrust"] = throttle * np.array(
+        #     [0.25 * 9.81 * 250, 0, 0, 0, 0, 0]
+        # )
+        # forces_map["rl_carier"]["local"]["thrust"] = throttle * np.array(
+        #     [0.25 * 9.81 * 250, 0, 0, 0, 0, 0]
+        # )
+
+        # forces_map["rr_wheel"]["global"]["thrust"] = throttle * np.array(
+        #     [0.25 * 9.81 * 250, 0, 0, 0, 0, 0]
+        # )
+        # forces_map["rl_wheel"]["global"]["thrust"] = throttle * np.array(
+        #     [0.25 * 9.81 * 250, 0, 0, 0, 0, 0]
+        # )
+
+        rr_torque = ForcesElements.motor(rr_wheel_kin, throttle)
+        rl_torque = ForcesElements.motor(rl_wheel_kin, throttle)
+        tau[model.tree_data.qdt0_names.rr_wheel_rev.psi] = rr_torque
+        tau[model.tree_data.qdt0_names.rl_wheel_rev.psi] = rl_torque
+
+        fr_torque = ForcesElements.motor(fr_wheel_kin, throttle)
+        fl_torque = ForcesElements.motor(fl_wheel_kin, throttle)
+        tau[model.tree_data.qdt0_names.fr_wheel_rev.psi] = fr_torque
+        tau[model.tree_data.qdt0_names.fl_wheel_rev.psi] = fl_torque
+
+        return tau, forces_map
+
+
+class StandingSimCallables(object):
+
+    @staticmethod
+    def construct_inputs_dict(t: float):
+        steering = 0
+        throttle = 0
+        inputs = {"throttle": throttle, "steering_input": steering}
+        return inputs
+
+    @staticmethod
+    def evaluate_motion_inputs(
+        model: Model, t: float, ydt0: np.ndarray, u: dict[str, float]
+    ):
+        return steering_function(0)
+
+    @staticmethod
+    def evaluate_force_inputs(
+        model: Model,
+        t: float,
+        ydt0: np.ndarray,
+        u: dict[str, float],
+    ) -> tuple[np.ndarray, dict[str, dict[str, np.ndarray]]]:
+
+        qdt0, qdt1 = ydt0.reshape(2, -1)
+        qdt2 = 0 * qdt1
+
+        tau = np.zeros_like(qdt0)
+
+        forces_map = model.forces_map
+
+        bodies_kinematics, _ = model.forward_kinematics_pass(qdt0, qdt1, qdt2)
+        chassis_kin = model.get_body_kinematics("chassis", bodies_kinematics)
+
+        fr_wheel_kin = model.get_body_kinematics("fr_wheel", bodies_kinematics)
+        fl_wheel_kin = model.get_body_kinematics("fl_wheel", bodies_kinematics)
+        rr_wheel_kin = model.get_body_kinematics("rr_wheel", bodies_kinematics)
+        rl_wheel_kin = model.get_body_kinematics("rl_wheel", bodies_kinematics)
+
+        fr_tire_force = ForcesElements.fr_tire(fr_wheel_kin, t)
+        fl_tire_force = ForcesElements.fl_tire(fl_wheel_kin, t)
+        rr_tire_force = ForcesElements.rr_tire(rr_wheel_kin, t)
+        rl_tire_force = ForcesElements.rl_tire(rl_wheel_kin, t)
+
+        forces_map["chassis"]["local"]["aero"] = ForcesElements.aero_force(chassis_kin)
+
+        forces_map["fr_wheel"]["global"]["tire"] = fr_tire_force
+        forces_map["fl_wheel"]["global"]["tire"] = fl_tire_force
+        forces_map["rr_wheel"]["global"]["tire"] = rr_tire_force
+        forces_map["rl_wheel"]["global"]["tire"] = rl_tire_force
+
+        tau[model.tree_data.qdt0_names.fr_susp.z] = ForcesElements.fr_spring(
+            qdt0[model.tree_data.qdt0_names.fr_susp.z],
+            qdt1[model.tree_data.qdt0_names.fr_susp.z],
+        )
+        tau[model.tree_data.qdt0_names.fl_susp.z] = ForcesElements.fl_spring(
+            qdt0[model.tree_data.qdt0_names.fl_susp.z],
+            qdt1[model.tree_data.qdt0_names.fl_susp.z],
+        )
+        tau[model.tree_data.qdt0_names.rr_susp.z] = ForcesElements.rr_spring(
+            qdt0[model.tree_data.qdt0_names.rr_susp.z],
+            qdt1[model.tree_data.qdt0_names.rr_susp.z],
+        )
+        tau[model.tree_data.qdt0_names.rl_susp.z] = ForcesElements.rl_spring(
+            qdt0[model.tree_data.qdt0_names.rl_susp.z],
+            qdt1[model.tree_data.qdt0_names.rl_susp.z],
+        )
+
+        return tau, forces_map

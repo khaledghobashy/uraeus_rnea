@@ -327,6 +327,8 @@ def construct_multibodytree(vehicle_data: VehicleData) -> MultiBodyTree:
         successor="fr_carier",
         succ_data=bodies_data.fr_carier,
         joint_type=CylindricalJoint,
+        # joint_type=TranslationalJoint,
+        # joint_type=RightSuspensionJoint,
         joint_data=joints_data.fr_susp,
     )
 
@@ -336,6 +338,7 @@ def construct_multibodytree(vehicle_data: VehicleData) -> MultiBodyTree:
         successor="fl_carier",
         succ_data=bodies_data.fl_carier,
         joint_type=CylindricalJoint,
+        # joint_type=LeftSuspensionJoint,
         joint_data=joints_data.fl_susp,
     )
 
@@ -344,7 +347,7 @@ def construct_multibodytree(vehicle_data: VehicleData) -> MultiBodyTree:
         predecessor="chassis",
         successor="rr_carier",
         succ_data=bodies_data.rr_carier,
-        joint_type=TranslationalJoint,
+        joint_type=RightSuspensionJoint,
         joint_data=joints_data.rr_susp,
     )
 
@@ -353,7 +356,7 @@ def construct_multibodytree(vehicle_data: VehicleData) -> MultiBodyTree:
         predecessor="chassis",
         successor="rl_carier",
         succ_data=bodies_data.rl_carier,
-        joint_type=TranslationalJoint,
+        joint_type=LeftSuspensionJoint,
         joint_data=joints_data.rl_susp,
     )
 

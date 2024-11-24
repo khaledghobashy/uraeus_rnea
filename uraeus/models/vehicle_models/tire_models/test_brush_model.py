@@ -108,7 +108,7 @@ class QuarterCarModel(object):
         model.forces_map["wheel"]["global"]["load"] = np.array(
             [0, 0, -65 * 9.81, 0, 0, 0]
         )
-        torque = (100) if t > 1 else 0
+        torque = (150) if t > 1 else 0
         torque = 0 if t > 5 else torque
         steering_torque = 0
         tau = np.array(

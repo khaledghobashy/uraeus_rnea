@@ -9,7 +9,8 @@ import jax
 from uraeus.utils.logging import construct_logger
 from uraeus.rnea.bodies import RigidBodyData
 from uraeus.rnea.joints import JointConfigInputs, RevoluteJoint
-from uraeus.rnea.topologies import MultiBodyTree, HybridModel
+from uraeus.rnea.topologies import MultiBodyTree
+from uraeus.rnea.multibody_models import Model
 
 logger = construct_logger(__name__, logging.DEBUG)
 
@@ -42,7 +43,7 @@ class DoublePendulum(object):
         tree.add_joint("j1", "ground", "l1", l1_data, RevoluteJoint, j1_data)
         tree.add_joint("j2", "l1", "l2", l2_data, RevoluteJoint, j2_data)
 
-        self.model = HybridModel(tree, [1])
+        self.model = Model(tree, hybrid_idx=[1])
 
     def forward_dynamics_call(
         self,
@@ -62,7 +63,7 @@ class DoublePendulum(object):
     def ssode(
         self, t, ydt0, forces_func: typing.Callable, motion_func: typing.Callable
     ) -> np.ndarray:
-        return self.model.ssode(t, ydt0, forces_func, motion_func)
+        return self.model.ssode(t, ydt0, {}, forces_func, motion_func)
 
 
 if __name__ == "__main__":
@@ -77,15 +78,13 @@ if __name__ == "__main__":
         qdt1_f = jax.jacfwd(qdt0_f)
         qdt2_f = jax.jacfwd(qdt1_f)
 
-    def motion_func(t):
+    def motion_func(model: Model, t: float, ydt0: np.ndarray, u: dict[str, float]):
         qdt0 = MotionFunctions.qdt0_f(t)
         qdt1 = MotionFunctions.qdt1_f(t)
         qdt2 = MotionFunctions.qdt2_f(t)
         return np.array([qdt0]), np.array([qdt1]), np.array([qdt2])
 
-    logger.debug(motion_func(0.0))
-
-    def force_func(model: HybridModel, qdt0, qdt1, qdt2, t):
+    def force_func(model: Model, qdt0, qdt1, qdt2, t):
         return np.zeros((2,)), model.forces_map
 
     ssode = lambda t, ydt0: model.ssode(t, ydt0, force_func, motion_func)
@@ -123,7 +122,6 @@ if __name__ == "__main__":
 
     plt.figure()
     plt.plot(test_t, [q[0] for q in test_qdt0])
-    # plt.plot(test_t, [q[1] + q[0] for q in test_qdt0])
     plt.grid()
 
     plt.show()

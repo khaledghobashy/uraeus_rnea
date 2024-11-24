@@ -7,7 +7,6 @@ import jax.numpy as jnp
 import numpy as np
 
 from uraeus.utils.logging import construct_logger
-
 from uraeus.rnea.bodies import BodyKinematics
 from uraeus.rnea.joints import JointKinematics, FunctionalJoint
 from uraeus.rnea.spatial_algebra import (
@@ -337,9 +336,9 @@ def ext_forces_to_gen_forces(
     )
     bodies_fe_S_l = [sum(forces[1], jnp.zeros((6,))) for forces in ext_forces]
     bodies_fe_S = [f1 + f2 for f1, f2 in zip(bodies_fe_S_g, bodies_fe_S_l)]
-    forces_transforms = [(j.p_SP) for j in reversed(joints_kin)]
+    forces_transforms = [j.p_SP for j in joints_kin]
     joints_forces = list(
-        reversed(
+        (
             joints_forces_accumulator(
                 list(bodies_fe_S),
                 forces_transforms,

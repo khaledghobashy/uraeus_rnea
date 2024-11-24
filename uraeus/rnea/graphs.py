@@ -141,23 +141,16 @@ def accumulate_leaf_to_root(
     def func(
         nodes_weights: list[Any],
         edges_weights: list[Any],
-        traversal_order: list[tuple[int, list[int]]],
+        adjacency_list: list[tuple[int, list[int]]],
     ):
-        # print("edges_weights = ", len(edges_weights))
         edges_cumvals = dict()
-        for successor_index, out_edges in reversed(traversal_order):
-            # print("successor_index, out_edges = ", successor_index, out_edges)
-            # print("edges_weights.index = ", [i - 1 for i in out_edges])
+        for successor_index, out_edges in reversed(adjacency_list):
             out_edges_weights = [edges_weights[i - 1] for i in out_edges]
             out_edges_cumvasl = [edges_cumvals[i] for i in out_edges]
             edge_val = cumfunc(
                 nodes_weights[successor_index], out_edges_weights, out_edges_cumvasl
             )
             edges_cumvals[successor_index] = edge_val
-
-        # jax.debug.print("edges_cumvals = {x}", x=edges_cumvals)
-        # print("edges_cumvals.keys", list(edges_cumvals.keys()))
-        # jax.debug.print("edges_cumvals.values = {x}", x=list(edges_cumvals.values()))
 
         return list(reversed(edges_cumvals.values()))[1:]
 
@@ -181,12 +174,10 @@ def extract_graph_data(tree: Tree) -> GraphConnectivity:
         nx.shortest_path(numbered_graph, source=0, target=i)[:0:-1]
         for i in list(numbered_graph.nodes)[:0:-1]
     ]
-    print("nodes_to_root_paths = ", nodes_to_root_paths)
     adjacency_list = tuple(
         (node, tuple(neighbors.keys()))
         for node, neighbors in numbered_graph.adj.items()
     )
-    print("numbered_graph.adj = ", numbered_graph.adj)
 
     graph_connectivity = GraphConnectivity(
         adjacency_list=adjacency_list,

@@ -123,7 +123,6 @@ def tip_to_base(
     )
 
     # Extract joints' transforms from joints' kinematics
-    # forces_transforms = [j.p_SP for j in reversed(joints_kinematics)]
     forces_transforms = [j.p_SP for j in joints_kinematics]
 
     # Traverse the tree tip-to-base and Evaluate joints' forces

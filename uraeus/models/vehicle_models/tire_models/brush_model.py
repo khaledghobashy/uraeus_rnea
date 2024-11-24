@@ -60,7 +60,9 @@ class BrushTireModel(object):
         self._is_sliding = False
 
         self._evaluate_tire_slips = (
-            evaluate_transient_slips if use_cpm_model else evaluate_tire_slips
+            self._evaluate_transient_slips
+            if use_cpm_model
+            else self._evaluate_steady_slips
         )
 
     def evaluate_tire_kinematics(
@@ -89,9 +91,15 @@ class BrushTireModel(object):
             )
             TG = Theta * sigma
 
-            transition = sigmoid(100 * (sigma - 1 / Theta))
-            factor = (3 * TG - 3 * TG**2 + TG**3) * (1 - transition) + transition
-            force = tire_parameters.mu * normal_load * factor
+            if sigma <= 1 / Theta:
+                factor = 3 * (TG) - 3 * (TG) ** 2 + (TG) ** 3
+                force = tire_parameters.mu * normal_load * factor
+            else:
+                force = tire_parameters.mu * normal_load
+
+            # transition = sigmoid(100 * (sigma - 1 / Theta))
+            # factor = (3 * TG - 3 * TG**2 + TG**3) * (1 - transition) + transition
+            # force = tire_parameters.mu * normal_load * factor
 
             F = force * normalize(sigma_vec)
             # Pneumatic Trail
@@ -114,30 +122,7 @@ class BrushTireModel(object):
         tire_kinematics = self.evaluate_tire_kinematics(wheel_kinematics)
         tire_parameters = self.tire_parameters
 
-        # kappa, alpha = evaluate_tire_slips(tire_kinematics)
-        # logger.debug(f"kappa = {kappa}")
-        # logger.debug(f"alpha = {alpha}")
-
-        (kappa, alpha), (u, v) = evaluate_transient_slips(
-            tire_parameters,
-            tire_kinematics,
-            low_speed_threshold=3,
-            ydt0=np.array([self._u, self._v]),
-            t0=self._last_t,
-            t=t,
-            is_sliding=self._is_sliding,
-        )
-        self._u = u
-        self._v = v
-        self._last_t = t
-        logger.debug(f"kappa = {kappa}")
-        logger.debug(f"alpha = {alpha}")
-        logger.debug(f"u = {u}")
-        logger.debug(f"v = {v}")
-        logger.debug(f"is_sliding = {self._is_sliding}")
-        logger.debug(f"sigma_k = {tire_parameters.sigma_k}")
-        logger.debug(f"sigma_a = {tire_parameters.sigma_a}")
-        logger.debug(f"tire_kinematics = {tire_kinematics}")
+        kappa, alpha = self._evaluate_tire_slips(tire_kinematics, t)
 
         normal_load = (
             tire_kinematics.vertical_deflection * tire_parameters.kz
@@ -151,6 +136,7 @@ class BrushTireModel(object):
 
         logger.debug(f"Fx_SAE = {Fx}")
         logger.debug(f"Fy_SAE = {Fy}")
+        logger.debug(f"Fz_SAE = {-normal_load}")
         logger.debug(f"My_SAE = {My}")
         logger.debug(f"Mz_SAE = {Mz}")
 
@@ -161,6 +147,35 @@ class BrushTireModel(object):
         tire_torque_G = tire_kinematics.sae_frame @ tire_torque_SAE
 
         return np.array([*tire_force_G, *tire_torque_G])
+
+    def _evaluate_transient_slips(self, tire_kinematics: TireKinematics, t: float):
+        (kappa, alpha), (u, v) = evaluate_transient_slips(
+            self.tire_parameters,
+            tire_kinematics,
+            low_speed_threshold=3,
+            ydt0=np.array([self._u, self._v]),
+            t0=self._last_t,
+            t=t,
+            is_sliding=self._is_sliding,
+        )
+
+        self._u = u
+        self._v = v
+        self._last_t = t
+        logger.debug(f"kappa = {kappa}")
+        logger.debug(f"alpha = {alpha}")
+        logger.debug(f"u = {u}")
+        logger.debug(f"v = {v}")
+        logger.debug(f"is_sliding = {self._is_sliding}")
+        logger.debug(f"tire_kinematics = {tire_kinematics}")
+
+        return kappa, alpha
+
+    def _evaluate_steady_slips(self, tire_kinematics: TireKinematics, t: float):
+        kappa, alpha = evaluate_tire_slips(tire_kinematics)
+        logger.debug(f"kappa = {kappa}")
+        logger.debug(f"alpha = {alpha}")
+        return kappa, alpha
 
     def __call__(self, wheel_kinematics: BodyKinematics, t: float):
         return self.evaluate_spatial_forces(wheel_kinematics, t)

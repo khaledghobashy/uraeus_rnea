@@ -11,7 +11,7 @@ from uraeus.models.vehicle_models.fsae.topology import (
     VehicleData,
     construct_multibodytree,
 )
-from uraeus.rnea.multibody_models import Model, HybridModel
+from uraeus.rnea.multibody_models import Model
 from uraeus.models.vehicle_models.fsae.simulations import (
     solve_for_static_equilibrium,
     acceleration_sim,
@@ -47,17 +47,19 @@ vehicle_data = VehicleData(
 
 topology = construct_multibodytree(vehicle_data)
 # model = Model(topology)
-model = HybridModel(topology, id_coordinates=[7, 9])
+# model = HybridModel(topology, id_coordinates=[7, 9])
+model = Model(topology, hybrid_idx=[7, 9])
 model.vehicle_data = vehicle_data
-print(model.hybrid_dynamics_data.permutation_matrix.shape)
 print(model.n)
+# print(model.hybrid_data)
 print(model.tree_data.qdt0_names)
+# exit()
 if __name__ == "__main__":
     system_inputs = {"throttle": 0, "steering_input": 0}
-    print(solve_for_static_equilibrium(model, u0=system_inputs, vx=0 / 3.6))
+    print(solve_for_static_equilibrium(model, u0=system_inputs, vx=120 / 3.6))
     # exit()
     # res = standing_sim(model)
-    res = acceleration_sim(model, u0=system_inputs, v0=30 / 3.6, tf=20)
+    res = acceleration_sim(model, u0=system_inputs, v0=1 / 3.6, tf=15)
 
     bodies_kinematics = [
         model.forward_kinematics_pass(
@@ -135,6 +137,31 @@ if __name__ == "__main__":
     plt.plot(
         res.time_history,
         res.qdt1_history[:, model.tree_data.qdt0_names.rl_wheel_rev.psi],
+        label="rl_wheel",
+    )
+    plt.legend()
+    plt.grid()
+
+    plt.figure("velocities.png")
+    plt.plot(res.time_history, [p[0] * 3.6 for p in chassis_v], label="chassis")
+    plt.plot(
+        res.time_history,
+        res.qdt1_history[:, model.tree_data.qdt0_names.fr_wheel_rev.psi] * 0.245 * 3.6,
+        label="fr_wheel",
+    )
+    plt.plot(
+        res.time_history,
+        res.qdt1_history[:, model.tree_data.qdt0_names.fl_wheel_rev.psi] * 0.245 * 3.6,
+        label="fl_wheel",
+    )
+    plt.plot(
+        res.time_history,
+        res.qdt1_history[:, model.tree_data.qdt0_names.rr_wheel_rev.psi] * 0.245 * 3.6,
+        label="rr_wheel",
+    )
+    plt.plot(
+        res.time_history,
+        res.qdt1_history[:, model.tree_data.qdt0_names.rl_wheel_rev.psi] * 0.245 * 3.6,
         label="rl_wheel",
     )
     plt.legend()

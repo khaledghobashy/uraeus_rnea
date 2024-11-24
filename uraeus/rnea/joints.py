@@ -315,7 +315,9 @@ def construct_custom_joint(
     )
 
     mobilizer = type(
-        f"{cls_name}Mobilizer", (CustomMobilizer,), {"polynomials": polynomials}
+        f"{cls_name}Mobilizer",
+        (CustomMobilizer,),
+        {"polynomials": polynomials, "nj": nj},
     )
 
     joint_class = type(

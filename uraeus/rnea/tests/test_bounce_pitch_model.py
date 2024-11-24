@@ -5,14 +5,8 @@ import jax.numpy as jnp
 import jax
 
 from uraeus.rnea.bodies import RigidBodyData
-from uraeus.rnea.joints import (
-    JointConfigInputs,
-    FreeJoint,
-    TranslationalJoint,
-    RevoluteJoint,
-)
-from uraeus.rnea.topologies import MultiBodyTree, Model
-from uraeus.rnea.tree_traversals import extract_mobilizer_forces
+from uraeus.rnea.joints import JointConfigInputs, FreeJoint
+from uraeus.rnea.multibody_models import MultiBodyTree, Model
 
 np.set_printoptions(precision=3)
 
@@ -155,7 +149,7 @@ class BouncePitchModelTest(unittest.TestCase):
         self.multibody_system.forces_map["m1"]["global"]["F1"] = F1
         self.multibody_system.forces_map["m1"]["global"]["F2"] = F2
 
-        qdt2 = self.multibody_system.forward_dynamics_pass(
+        qdt2 = self.multibody_system.forward_dynamics_call(
             qdt0, qdt1, np.zeros_like(qdt1)
         )
         bodies_kinematics, joints_kinematics = (

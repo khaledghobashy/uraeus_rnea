@@ -83,7 +83,7 @@ class DoublePendulumTest(unittest.TestCase):
         res: IDCallRes = self.multibody_system.inverse_dynamics_pass(qdt0, qdt1, qdt2)
         tau = res.tau
 
-        qdt2_test = self.multibody_system.forward_dynamics_pass(qdt0, qdt1, tau)
+        qdt2_test = self.multibody_system.forward_dynamics_call(qdt0, qdt1, tau)
 
         return qdt2, qdt2_test
 

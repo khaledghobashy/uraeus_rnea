@@ -6,8 +6,8 @@ import jax
 
 from uraeus.rnea.bodies import RigidBodyData
 from uraeus.rnea.joints import JointConfigInputs, TranslationalJoint
-from uraeus.rnea.topologies import MultiBodyTree, Model
-from uraeus.rnea.tree_traversals import extract_mobilizer_forces
+from uraeus.rnea.topologies import MultiBodyTree
+from uraeus.rnea.multibody_models import Model
 
 
 class AnalyticalMassSpringDamper(object):
@@ -93,7 +93,7 @@ class MassSpringDamperTest(unittest.TestCase):
             self.multibody_system.fc(qdt1[0])
         )
 
-        qdt2 = self.multibody_system.forward_dynamics_pass(
+        qdt2 = self.multibody_system.forward_dynamics_call(
             qdt0, qdt1, np.zeros_like(qdt1)
         )
 
